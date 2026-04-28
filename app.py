@@ -7,53 +7,24 @@ import plotly.graph_objects as go
 # 1. ページ設定
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正（セレクトボックスの文字色バグを完全に修正）
+# 2. デザイン修正（Amazonトンマナ & 文字色バグ完全固定）
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
-    
-    /* 入力エリア・セレクトボックスの文字色を黒に強制 */
     input { color: #131921 !important; }
-    
-    /* セレクトボックスの選択済みテキスト（白文字化対策） */
-    div[data-baseweb="select"] * {
-        color: #131921 !important;
-    }
-    
+    div[data-baseweb="select"] * { color: #131921 !important; }
     html, body, [data-testid="stAppViewContainer"], .stApp {
         background-color: #FFFFFF !important;
         color: #131921 !important;
         font-family: 'Inter', sans-serif !important;
     }
-
-    [data-testid="stHeader"] { 
-        background-color: rgba(255, 255, 255, 0) !important; 
-        color: #131921 !important;
-    }
     #MainMenu, footer { visibility: hidden !important; }
-
     [data-testid="stSidebar"] { background-color: #131921 !important; }
     [data-testid="stSidebar"] * { color: #FFFFFF !important; }
-
-    /* サイドバー内のラジオボタンやテキストは白 */
-    [data-testid="stSidebar"] div[data-baseweb="radio"] * {
-        color: #FFFFFF !important;
-    }
-
-    /* 期間選択ボックス（白背景・黒文字を徹底） */
-    div[data-baseweb="select"] > div {
-        background-color: #FFFFFF !important;
-        border: 1px solid #D5D9D9 !important;
-    }
-
-    div[data-testid="stMetricValue"] {
-        color: #131921 !important;
-        font-weight: 800 !important;
-        letter-spacing: -0.03em !important;
-    }
-
+    [data-testid="stSidebar"] div[data-baseweb="radio"] * { color: #FFFFFF !important; }
+    div[data-baseweb="select"] > div { background-color: #FFFFFF !important; border: 1px solid #D5D9D9 !important; }
+    div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important; }
     h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; }
-    .st-emotion-cache-zy6yx3 {padding: 3rem 5rem 10rem;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -62,10 +33,38 @@ def load_data(url):
     res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
     return io.BytesIO(res.content)
 
+# --- 詳細表示用モーダル関数の定義 ---
+@st.dialog("商品詳細分析", width="large")
+def show_product_detail(asin, full_data, summary_row):
+    st.subheader(f"{summary_row['正式品名']}")
+    st.caption(f"ASIN: {asin} | 規格: {summary_row['規格']}")
+    
+    col_d1, col_d2 = st.columns([2, 1])
+    
+    # 過去12ヶ月の推移
+    prod_trend = full_data[full_data['ASIN'] == asin].sort_values('日付_dt').tail(12)
+    
+    with col_d1:
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=prod_trend['年月'], y=prod_trend['売上'], mode='lines+markers', line=dict(color='#FF9900', width=3)))
+        fig.update_layout(title="直近12ヶ月の売上推移", height=300, plot_bgcolor='white', margin=dict(l=0,r=0,t=30,b=0))
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col_d2:
+        st.write("**現在のステータス**")
+        st.metric("ABCランク", summary_row['ABC'])
+        st.metric("季節性スコア", f"{summary_row['季節性']:.2f}")
+        if summary_row['季節性'] > 1.2:
+            st.success("🔥 売上ピーク期です")
+        elif summary_row['季節性'] < 0.8:
+            st.warning("❄️ 需要低下期です")
+
 try:
+    # データ読み込み
     df_m = pd.read_excel(load_data("http://gigaplus.makeshop.jp/aimedia/data/master.xlsx"))
     df_s = pd.read_excel(load_data("http://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"))
 
+    # クレンジング
     df_s.columns = df_s.columns.str.strip()
     df_m.columns = df_m.columns.str.strip()
     for c in ['売上', '数量']:
@@ -83,7 +82,6 @@ try:
     # --- サイドバー ---
     st.sidebar.title("Amazon Analytics")
     mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"], key="mode")
-    st.sidebar.markdown("---")
     unit = st.sidebar.radio("表示単位を選択", ["月単位", "年度単位"], horizontal=True)
 
     if mode == "通常モード":
@@ -93,7 +91,6 @@ try:
     else:
         opts = all_m if unit == "月単位" else all_y
         target_p = st.sidebar.selectbox("現在の期間（現在）", opts, index=0, key="m2")
-        st.sidebar.markdown("---")
         c_unit = st.sidebar.radio("比較先の単位を選択", ["月単位", "年度単位"], horizontal=True, key="cu")
         c_opts = all_m if c_unit == "月単位" else all_y
         comp_p = st.sidebar.selectbox("比較する期間（比較）", c_opts, index=min(1, len(c_opts)-1), key="m3")
@@ -136,32 +133,11 @@ try:
         m2.metric("合計数量", f"{int(sum_now['数量'].sum()):,}")
     m3.metric("商品数", f"{len(sum_now):,}")
 
-    # --- ドリルダウン ---
-    st.markdown("---")
-    st.subheader("商品詳細ドリルダウン")
-    selected_asin = st.selectbox(
-        "分析する商品を選択してください",
-        options=sum_now['ASIN'].tolist(),
-        format_func=lambda x: f"{sum_now[sum_now['ASIN']==x]['正式品名'].values[0]} ({x})",
-        key="asin_selector"
-    )
-
-    if selected_asin:
-        col_d1, col_d2 = st.columns([2, 1])
-        prod_trend = df_f[df_f['ASIN'] == selected_asin].sort_values('日付_dt').tail(12)
-        prod_info = sum_now[sum_now['ASIN'] == selected_asin].iloc[0]
-
-        with col_d1:
-            fig_prod = go.Figure()
-            fig_prod.add_trace(go.Scatter(x=prod_trend['年月'], y=prod_trend['売上'], mode='lines+markers', marker_color='#FF9900'))
-            fig_prod.update_layout(title=f"売上推移: {prod_info['正式品名'][:30]}...", height=300, plot_bgcolor='white')
-            st.plotly_chart(fig_prod, use_container_width=True)
-        with col_d2:
-            st.info(f"**{prod_info['ABC']}ランク** / 季節性: {prod_info['季節性']:.2f}")
-
     # --- 詳細分析テーブル ---
     st.markdown("---")
     st.subheader("売上詳細分析")
+    st.info("表の左端にあるチェックをいれると、商品の詳細分析モーダルが開きます。")
+
     def style_abc(v):
         if v == 'A': return 'color: #FF9900; font-weight: 800;'
         if v == 'B': return 'color: #232F3E; font-weight: 700;'
@@ -186,7 +162,23 @@ try:
     if search:
         disp = disp[disp['正式品名'].str.lower().str.contains(search, na=False) | disp['ASIN'].str.lower().str.contains(search, na=False)]
 
-    st.dataframe(disp.style.format(fmt).map(style_abc, subset=['ABC']), use_container_width=True, height=500, hide_index=True)
+    # --- インタラクティブ・データフレーム ---
+    # on_select="rerun" を使うことで、行選択時にスクリプトを再実行してモーダルを出す
+    event = st.dataframe(
+        disp.style.format(fmt).map(style_abc, subset=['ABC']), 
+        use_container_width=True, 
+        height=600,
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="single_row"
+    )
+
+    # 行が選択されたらモーダルを表示
+    if event.selection.rows:
+        selected_row_idx = event.selection.rows[0]
+        selected_row_data = disp.iloc[selected_row_idx]
+        # モーダル関数を呼び出し
+        show_product_detail(selected_row_data['ASIN'], df_f, selected_row_data)
 
 except Exception as e:
     st.error(f"システムエラー: {e}")
