@@ -12,16 +12,51 @@ st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sid
 URL_MASTER = "http://gigaplus.makeshop.jp/aimedia/data/master.xlsx"
 URL_SALES = "http://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"
 
-# 2. スタイル設定（Amazonスタイル・ライトモード固定）
+# 2. スタイル設定（Amazonスタイル・ライトモード完全固定）
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-    .stApp { background-color: #FFFFFF !important; color: #131921 !important; font-family: 'Inter', sans-serif !important; }
-    [data-testid="stSidebar"] { background-color: #131921 !important; border-right: 1px solid #232f3e !important; }
-    [data-testid="stSidebar"] * { color: #FFFFFF !important; }
-    div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; font-size: 2.2rem !important; }
-    .stDataFrame { border: 1px solid #D5D9D9 !important; border-radius: 4px !important; }
-    h1, h2, h3 { color: #131921 !important; font-weight: 700 !important; }
+    /* 全体の背景と文字色を強制固定 */
+    .stApp {
+        background-color: #FFFFFF !important;
+        color: #131921 !important;
+    }
+    
+    /* サイドバーの背景色と文字色 */
+    [data-testid="stSidebar"] {
+        background-color: #131921 !important;
+        color: #FFFFFF !important;
+    }
+    [data-testid="stSidebar"] * {
+        color: #FFFFFF !important;
+    }
+
+    /* 入力フォーム（セレクトボックス等）の視認性改善 */
+    div[data-baseweb="select"] > div {
+        background-color: #FFFFFF !important;
+        color: #131921 !important; /* 文字を黒に */
+        border: 1px solid #D5D9D9 !important;
+    }
+    
+    /* セレクトボックス内のテキスト色を強制 */
+    div[data-testid="stSelectbox"] label p {
+        color: #FFFFFF !important; /* サイドバー内のラベルは白 */
+    }
+    
+    /* メインエリアの数値（Metric） */
+    div[data-testid="stMetricValue"] {
+        color: #131921 !important;
+        font-weight: 800 !important;
+    }
+
+    /* タイトル等の色 */
+    h1, h2, h3, p, span {
+        color: #131921 !important;
+    }
+    
+    /* サイドバー内のテキスト入力ラベル */
+    [data-testid="stSidebar"] .stMarkdown p {
+        color: #FFFFFF !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -55,10 +90,10 @@ try:
     st.sidebar.markdown("---")
     
     st.sidebar.subheader("期間選択")
+    # ここで表示されるセレクトボックス内の文字が見えるように修正
     start_month = st.sidebar.selectbox("開始月", all_months, index=len(all_months)-1)
     end_month = st.sidebar.selectbox("終了月", all_months, index=0)
     
-    # 期間フィルタリング
     target_period = df_sales[(df_sales['年月'] >= start_month) & (df_sales['年月'] <= end_month)]
 
     st.sidebar.markdown("---")
@@ -81,7 +116,6 @@ try:
     # --- メイン表示 ---
     st.title("Sales Performance Dashboard")
     
-    # KPIエリア
     m1, m2, m3 = st.columns(3)
     total_sales = main_summary['売上'].sum()
     total_qty = main_summary['数量'].sum()
@@ -89,14 +123,9 @@ try:
     if is_compare:
         comp_summary = get_period_summary(df_combined, compare_start, compare_end)
         total_sales_comp = comp_summary['売上'].sum()
-        
-        # MoM/YoYの計算ロジック（期間が同じ長さと想定）
         growth = ((total_sales / total_sales_comp) - 1) * 100 if total_sales_comp > 0 else 0
-        
-        # 簡易的に比較対象をMoM/YoYとして表示
         m1.metric("選択期間の売上", f"¥{int(total_sales):,}", f"{growth:+.1f}%")
         m2.metric("比較対象の売上", f"¥{int(total_sales_comp):,}")
-        st.caption("※前月比較なら MoM、前年同月比較なら YoY として確認してください。")
     else:
         m1.metric("合計売上", f"¥{int(total_sales):,}")
         m2.metric("合計数量", f"{int(total_qty):,}")
@@ -112,17 +141,17 @@ try:
         y=trend_data['売上'],
         marker_color='#FF9900',
         name='売上',
-        hovertemplate='売上: ¥%{y:,.0f}<extra></extra>' # マウスオーバーで売上のみ表示
+        hovertemplate='売上: ¥%{y:,.0f}<extra></extra>'
     ))
     fig.update_layout(
-        plot_bgcolor='white', paper_bgcolor='white',
+        plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
         margin=dict(l=20, r=20, t=20, b=20), height=300,
-        xaxis=dict(showline=True, showgrid=False, linecolor='#D5D9D9', title="年月"),
-        yaxis=dict(showline=True, showgrid=True, gridcolor='#F3F3F3', linecolor='#D5D9D9', title="売上(¥)")
+        xaxis=dict(showline=True, showgrid=False, linecolor='#D5D9D9'),
+        yaxis=dict(showline=True, showgrid=True, gridcolor='#F3F3F3', linecolor='#D5D9D9')
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- データ詳細テーブル ---
+    # --- データ詳細 ---
     st.subheader("在庫・売上詳細")
     search = st.text_input("クイック検索 (商品名, コード, ASIN)", "").lower()
     
@@ -134,7 +163,6 @@ try:
             display_df['ASIN'].str.lower().str.contains(search, na=False)
         ]
 
-    # テーブル用カラム名設定
     display_df.columns = ['ASIN', 'コード', '正式品名', '規格', '売上', '数量']
     st.dataframe(
         display_df.style.format({'売上': '¥{:,.0f}', '数量': '{:,.0f}'}),
