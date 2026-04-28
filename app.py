@@ -70,14 +70,13 @@ try:
 
     df_f = pd.merge(df_s, df_m, on='ASIN', how='left').fillna({'コード':'N/A', '正式品名':'不明', '規格':'-'})
 
-    # --- 分析ロジック (ABC & 季節性) ---
+    # --- 分析ロジック ---
     def add_analytics(df_base, df_target):
         df_target = df_target.sort_values('売上', ascending=False)
         total_sales = df_target['売上'].sum()
         df_target['累計比率'] = df_target['売上'].cumsum() / total_sales if total_sales > 0 else 0
         df_target['ABCランク'] = df_target['累計比率'].apply(lambda x: 'A' if x <= 0.7 else ('B' if x <= 0.9 else 'C'))
         
-        # 季節性スコア
         avg_sales = df_base.groupby('ASIN')['売上'].mean().reset_index()
         avg_sales.columns = ['ASIN', '平均売上']
         df_target = pd.merge(df_target, avg_sales, on='ASIN', how='left')
@@ -125,39 +124,40 @@ try:
     st.markdown("---")
     st.subheader("売上詳細分析")
 
-    # スタイル定義
     def style_abc(val):
         if val == 'A': return 'background-color: #FF9900; color: white; font-weight: 800; text-align: center;'
         if val == 'B': return 'background-color: #232F3E; color: white; font-weight: 700; text-align: center;'
         return 'background-color: #D5D9D9; color: #131921; text-align: center;'
 
+    # 表示用データ作成
     if mode == "比較モード" and comp_p:
         disp = pd.merge(main_sum, prev_sum[['ASIN', '売上', '数量']], on='ASIN', how='outer', suffixes=('', '_比較')).fillna(0)
         disp['MoM/YoY(%)'] = ((disp['売上'] / disp['売上_比較']) - 1) * 100
         disp.loc[disp['売上_比較'] == 0, 'MoM/YoY(%)'] = 0
-        
         c1, c2 = f"売上({target_p})", f"売上({comp_p})"
         disp = disp[['ABCランク', 'ASIN', '正式品名', '規格', '売上', '売上_比較', 'MoM/YoY(%)', '季節性スコア']]
         disp.columns = ['ABCランク', 'ASIN', '正式品名', '規格', c1, c2, 'MoM/YoY(%)', '季節性スコア']
-        
-        # Pandas 2.x対応: applymap -> map
-        st.dataframe(
-            disp.style.format({c1: '¥{:,.0f}', c2: '¥{:,.0f}', 'MoM/YoY(%)': '{:+.1f}%', '季節性スコア': '{:.2f}'})
-            .background_gradient(subset=['MoM/YoY(%)'], cmap='RdYlGn')
-            .background_gradient(subset=['季節性スコア'], cmap='Oranges')
-            .map(style_abc, subset=['ABCランク']),
-            use_container_width=True, height=600
-        )
+        st_disp = disp.style.format({c1: '¥{:,.0f}', c2: '¥{:,.0f}', 'MoM/YoY(%)': '{:+.1f}%', '季節性スコア': '{:.2f}'})
     else:
         disp = main_sum[['ABCランク', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性スコア']]
-        
-        st.dataframe(
-            disp.style.format({'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性スコア': '{:.2f}'})
-            .background_gradient(subset=['売上'], cmap='YlGnBu')
-            .background_gradient(subset=['季節性スコア'], cmap='Oranges')
-            .map(style_abc, subset=['ABCランク']),
-            use_container_width=True, height=600
-        )
+        st_disp = disp.style.format({'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性スコア': '{:.2f}'})
+
+    # スタイリングの適用（matplotlibエラー回避用）
+    try:
+        if mode == "比較モード":
+            st_disp = st_disp.background_gradient(subset=['MoM/YoY(%)'], cmap='RdYlGn').background_gradient(subset=['季節性スコア'], cmap='Oranges')
+        else:
+            st_disp = st_disp.background_gradient(subset=['売上'], cmap='YlGnBu').background_gradient(subset=['季節性スコア'], cmap='Oranges')
+    except ImportError:
+        pass # matplotlibがない場合は色付けなしで継続
+
+    # ABCランクのスタイル適用（Pandas 2.1.0以降対応）
+    if hasattr(st_disp, 'map'):
+        st_disp = st_disp.map(style_abc, subset=['ABCランク'])
+    else:
+        st_disp = st_disp.applymap(style_abc, subset=['ABCランク'])
+
+    st.dataframe(st_disp, use_container_width=True, height=600)
 
 except Exception as e:
     st.error(f"システムエラー: {e}")
