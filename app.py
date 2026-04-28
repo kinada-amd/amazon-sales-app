@@ -70,10 +70,8 @@ try:
     df_s['年月'] = df_s['日付_dt'].dt.strftime('%Y-%m')
     
     # 年度計算 (4月開始)
-    # 1-3月なら年を-1することで「25年3月」を「24年度」として扱う
     df_s['年度'] = df_s['日付_dt'].apply(lambda x: f"{str(x.year - 1)[2:]}年度" if x.month <= 3 else f"{str(x.year)[2:]}年度")
 
-    # 選択肢の作成（月リスト + 年度リスト）
     all_months = sorted(df_s['年月'].dropna().unique(), reverse=True)
     all_years = sorted(df_s['年度'].dropna().unique(), reverse=True)
     all_options = all_years + all_months
@@ -92,7 +90,6 @@ try:
 
     df_f = pd.merge(df_s, df_m, on='ASIN', how='left').fillna({'コード':'N/A', '正式品名':'不明', '規格':'-'})
 
-    # 集計用関数 (月または年度でフィルタリング)
     def filter_data(df, period):
         if "年度" in period:
             return df[df['年度'] == period]
@@ -116,20 +113,27 @@ try:
         m1.metric(f"売上 ({target_m})", f"¥{int(val_now):,}", f"{pct:+.1f}%")
         m2.metric(f"売上 ({comp_m})", f"¥{int(val_prev):,}")
         
+        # データのマージ
         disp = pd.merge(main_res, prev_res[['ASIN', '売上', '数量']], on='ASIN', how='outer', suffixes=('', '_比較')).fillna(0)
         
-        # 伸長率の計算
-        disp['MoM/YoY (%)'] = ((disp['売上'] / disp['売上_比較']) - 1) * 100
-        disp.loc[disp['売上_比較'] == 0, 'MoM/YoY (%)'] = 0
+        # 売上の伸長率計算
+        disp['売上 MoM/YoY (%)'] = ((disp['売上'] / disp['売上_比較']) - 1) * 100
+        disp.loc[disp['売上_比較'] == 0, '売上 MoM/YoY (%)'] = 0
         
-        # 右端用にも同じ値の列を作成
-        disp['MoM/YoY (%)_右'] = disp['MoM/YoY (%)']
+        # 数量の伸長率計算
+        disp['数量 MoM/YoY (%)'] = ((disp['数量'] / disp['数量_比較']) - 1) * 100
+        disp.loc[disp['数量_比較'] == 0, '数量 MoM/YoY (%)'] = 0
         
-        col_now, col_prev = f"売上({target_m})", f"売上({comp_m})"
-        disp = disp[['ASIN', 'コード', '正式品名', '規格', '売上', '売上_比較', 'MoM/YoY (%)', '数量', 'MoM/YoY (%)_右']]
-        disp.columns = ['ASIN', 'コード', '正式品名', '規格', col_now, col_prev, 'MoM/YoY (%)', '数量', 'MoM/YoY (%) ']
+        # カラム名の動的作成
+        col_s_now, col_s_prev = f"売上({target_m})", f"売上({comp_m})"
+        col_q_now, col_q_prev = f"数量({target_m})", f"数量({comp_m})"
         
-        fmt = {col_now: '¥{:,.0f}', col_prev: '¥{:,.0f}', 'MoM/YoY (%)': '{:+.1f}%', '数量': '{:,.0f}', 'MoM/YoY (%) ': '{:+.1f}%'}
+        # カラム順序の整理
+        disp = disp[['ASIN', 'コード', '正式品名', '規格', '売上', '売上_比較', '売上 MoM/YoY (%)', '数量', '数量_比較', '数量 MoM/YoY (%)']]
+        disp.columns = ['ASIN', 'コード', '正式品名', '規格', col_s_now, col_s_prev, '売上 MoM/YoY (%)', col_q_now, col_q_prev, '数量 MoM/YoY (%)']
+        
+        fmt = {col_s_now: '¥{:,.0f}', col_s_prev: '¥{:,.0f}', '売上 MoM/YoY (%)': '{:+.1f}%', 
+               col_q_now: '{:,.0f}', col_q_prev: '{:,.0f}', '数量 MoM/YoY (%)': '{:+.1f}%'}
     else:
         m1.metric(f"売上 ({target_m})", f"¥{int(val_now):,}")
         m2.metric("合計数量", f"{int(main_res['数量'].sum()):,}")
