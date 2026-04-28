@@ -5,26 +5,23 @@ import io
 import requests
 import plotly.graph_objects as go
 
-# 1. ページ設定
+# 1. ページ設定（ライトモード固定のための設定）
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
 # --- 【URL設定】 ---
 URL_MASTER = "http://gigaplus.makeshop.jp/aimedia/data/master.xlsx"
 URL_SALES = "http://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"
 
-# 2. スタイル設定（Amazonスタイル：ライトモード強制固定）
+# 2. 強制ライトモードCSS（ダークモードの徹底削除）
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
-    
-    /* 背景と文字色を白・黒に完全固定（ダークモード無効化） */
-    html, body, [data-testid="stAppViewContainer"], .stApp {
+    /* 全体の背景と文字色を強制固定 */
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"], .stApp {
         background-color: #FFFFFF !important;
         color: #131921 !important;
-        font-family: 'Inter', sans-serif !important;
     }
     
-    /* サイドバー */
+    /* サイドバーの背景色と文字色 */
     [data-testid="stSidebar"] {
         background-color: #131921 !important;
     }
@@ -32,32 +29,29 @@ st.markdown("""
         color: #FFFFFF !important;
     }
 
-    /* 入力エリア（セレクトボックス等）の視認性向上 */
+    /* セレクトボックス内の文字色（枠内を白背景・黒文字に固定） */
     div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important;
         color: #131921 !important;
     }
     div[data-testid="stSelectbox"] div[data-baseweb="select"] div {
         color: #131921 !important;
-        font-weight: 600 !important;
+    }
+    
+    /* 入力ラベルの白固定（サイドバー内） */
+    [data-testid="stSidebar"] label, [data-testid="stSidebar"] p {
+        color: #FFFFFF !important;
     }
 
-    /* メトリック（大きな数字） */
+    /* メインエリアの各テキスト */
+    h1, h2, h3, h4, p, span, label {
+        color: #131921 !important;
+    }
+    
+    /* メトリック（数値） */
     div[data-testid="stMetricValue"] {
         color: #131921 !important;
         font-weight: 800 !important;
-        font-family: 'Inter', sans-serif !important;
-    }
-    
-    h1, h2, h3 {
-        color: #131921 !important;
-        font-weight: 700 !important;
-    }
-
-    /* データフレームのヘッダー色 */
-    .stDataFrame thead tr th {
-        background-color: #F3F3F3 !important;
-        color: #131921 !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -87,40 +81,42 @@ try:
     df_sales['年月'] = df_sales['日付_dt'].dt.strftime('%Y-%m')
     all_months = sorted(df_sales['年月'].dropna().unique(), reverse=True)
 
-    # --- サイドバー ---
+    # --- サイドバー：モード切替 ---
     st.sidebar.title("Amazon Analytics")
     st.sidebar.markdown("---")
     
-    mode = st.sidebar.radio("表示モードを選択", ["通常モード（期間集計）", "比較モード（MoM / YoY）"])
+    mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"])
     
     st.sidebar.markdown("---")
     
-    if mode == "通常モード（期間集計）":
+    if mode == "通常モード":
         st.sidebar.subheader("集計期間の設定")
-        start_month = st.sidebar.selectbox("開始月", all_months, index=len(all_months)-1, key="s1")
-        end_month = st.sidebar.selectbox("終了月", all_months, index=0, key="e1")
+        start_month = st.sidebar.selectbox("開始月", all_months, index=len(all_months)-1)
+        end_month = st.sidebar.selectbox("終了月", all_months, index=0)
         is_compare = False
     else:
         st.sidebar.subheader("ベース期間（現在）")
-        start_month = st.sidebar.selectbox("開始月", all_months, index=0, key="s2")
-        end_month = st.sidebar.selectbox("終了月", all_months, index=0, key="e2")
+        start_month = st.sidebar.selectbox("開始月", all_months, index=0)
+        end_month = st.sidebar.selectbox("終了月", all_months, index=0)
         
         st.sidebar.markdown("---")
         st.sidebar.subheader("比較対象期間（過去）")
-        compare_start = st.sidebar.selectbox("比較開始月", all_months, index=min(1, len(all_months)-1), key="cs")
-        compare_end = st.sidebar.selectbox("比較終了月", all_months, index=min(1, len(all_months)-1), key="ce")
+        compare_start = st.sidebar.selectbox("比較開始", all_months, index=min(1, len(all_months)-1))
+        compare_end = st.sidebar.selectbox("比較終了", all_months, index=min(1, len(all_months)-1))
         is_compare = True
 
-    # --- データ処理 ---
+    # --- 共通集計処理 ---
     df_combined = pd.merge(df_sales, df_master, on='ASIN', how='left').fillna({'コード':'N/A', '正式品名':'不明', '規格':'-'})
     
     def get_summary(df, s, e):
-        temp = df[(df['年月'] >= s) & (df['年月'] <= e)]
-        return temp.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
+        # 期間内のデータを絞り込んで集計
+        mask = (df['年月'] >= s) & (df['年月'] <= e)
+        return df[mask].groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
 
+    # メイン表示用のデータ
     main_summary = get_summary(df_combined, start_month, end_month)
 
-    # --- メインエリア ---
+    # --- メインエリア表示 ---
     st.title("Sales Performance Dashboard")
     
     m1, m2, m3 = st.columns(3)
@@ -134,7 +130,7 @@ try:
         
         m1.metric("Selected Sales", f"¥{int(total_sales):,}", f"{growth:+.1f}%")
         m2.metric("Comparison Sales", f"¥{int(total_sales_comp):,}")
-        st.info(f"比較対象: {compare_start} 〜 {compare_end}")
+        st.info(f"比較対象期間: {compare_start} 〜 {compare_end}")
     else:
         m1.metric("Total Sales", f"¥{int(total_sales):,}")
         m2.metric("Total Units", f"{int(total_qty):,}")
@@ -143,8 +139,8 @@ try:
 
     # --- 売上推移グラフ ---
     st.subheader("Revenue Trend")
-    # グラフ用データは常にメインの期間を表示
-    trend_data = df_combined[(df_combined['年月'] >= start_month) & (df_combined['年月'] <= end_month)].groupby('年月')['売上'].sum().reset_index()
+    trend_mask = (df_combined['年月'] >= start_month) & (df_combined['年月'] <= end_month)
+    trend_data = df_combined[trend_mask].groupby('年月')['売上'].sum().reset_index()
     
     fig = go.Figure()
     fig.add_trace(go.Bar(
@@ -155,7 +151,6 @@ try:
     fig.update_layout(
         plot_bgcolor='white', paper_bgcolor='white',
         margin=dict(l=0, r=0, t=20, b=0), height=300,
-        font=dict(family="Inter, sans-serif", size=12, color="#131921"),
         xaxis=dict(showline=True, showgrid=False, linecolor='#D5D9D9'),
         yaxis=dict(showline=True, showgrid=True, gridcolor='#F3F3F3', linecolor='#D5D9D9')
     )
