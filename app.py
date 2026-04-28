@@ -11,7 +11,7 @@ st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sid
 URL_MASTER = "http://gigaplus.makeshop.jp/aimedia/data/master.xlsx"
 URL_SALES = "http://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"
 
-# 2. デザイン修正（Amazonトーン＆マナー / ライトモード強制 / Amazon Ember風フォント）
+# 2. デザイン修正（Amazonトーン＆マナー / ライトモード強制）
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
@@ -39,10 +39,7 @@ st.markdown("""
     div[data-testid="stMetricValue"] {
         color: #131921 !important;
         font-weight: 800 !important;
-        font-family: 'Inter', sans-serif !important;
     }
-    
-    h1, h2, h3 { color: #131921 !important; font-family: 'Inter', sans-serif !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -66,19 +63,27 @@ try:
 
     # --- サイドバー ---
     st.sidebar.title("Amazon Analytics")
-    mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"])
+    # モード切り替え。indexを変えることでリセットに近い挙動を実現
+    mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"], key="mode_selector")
     
+    st.sidebar.markdown("---")
+
     if mode == "通常モード":
         st.sidebar.subheader("期間選択")
-        s_m = st.sidebar.selectbox("開始月", all_m, index=len(all_m)-1, key="s1")
-        e_m = st.sidebar.selectbox("終了月", all_m, index=0, key="e1")
+        s_m = st.sidebar.selectbox("開始月", all_m, index=len(all_m)-1, key="reg_start")
+        e_m = st.sidebar.selectbox("終了月", all_m, index=0, key="reg_end")
+        # 比較用変数を初期化
+        cs_m, ce_m = None, None
     else:
-        st.sidebar.subheader("現在の期間")
-        s_m = st.sidebar.selectbox("開始", all_m, index=0, key="s2")
-        e_m = st.sidebar.selectbox("終了", all_m, index=0, key="e2")
-        st.sidebar.subheader("比較対象の期間")
-        cs_m = st.sidebar.selectbox("比較開始", all_m, index=min(1, len(all_m)-1))
-        ce_m = st.sidebar.selectbox("比較終了", all_m, index=min(1, len(all_m)-1))
+        # 比較モード：各窓を独立して表示
+        st.sidebar.subheader("現在の期間（現在）")
+        s_m = st.sidebar.selectbox("開始月(現在)", all_m, index=0, key="comp_now_start")
+        e_m = st.sidebar.selectbox("終了月(現在)", all_m, index=0, key="comp_now_end")
+        
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("比較対象の期間（比較）")
+        cs_m = st.sidebar.selectbox("開始月(比較)", all_m, index=min(1, len(all_m)-1), key="comp_prev_start")
+        ce_m = st.sidebar.selectbox("終了月(比較)", all_m, index=min(1, len(all_m)-1), key="comp_prev_end")
 
     # --- 集計ロジック ---
     df_f = pd.merge(df_s, df_m, on='ASIN', how='left').fillna({'コード':'N/A', '正式品名':'不明', '規格':'-'})
@@ -87,31 +92,48 @@ try:
         mask = (df['年月'] >= start) & (df['年月'] <= end)
         return df[mask].groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
 
+    # 「現在」の集計
     main_res = get_summary(df_f, s_m, e_m)
 
     # --- メイン表示 ---
     st.title("Sales Performance Dashboard")
     
-    m1, m2, m3 = st.columns(3)
     val_now = main_res['売上'].sum()
+    m1, m2, m3 = st.columns(3)
 
     if mode == "比較モード":
+        # 「比較」の集計
         comp_res = get_summary(df_f, cs_m, ce_m)
         val_prev = comp_res['売上'].sum()
         pct = ((val_now / val_prev) - 1) * 100 if val_prev > 0 else 0
         
-        m1.metric("現在の期間の売上", f"¥{int(val_now):,}", f"{pct:+.1f}%")
-        m2.metric("比較期間の売上", f"¥{int(val_prev):,}")
+        m1.metric(f"売上 (現在: {s_m}〜{e_m})", f"¥{int(val_now):,}", f"{pct:+.1f}%")
+        m2.metric(f"売上 (比較: {cs_m}〜{ce_m})", f"¥{int(val_prev):,}")
         
-        # 比較表の作成（規格を含む）
-        disp = pd.merge(main_res, comp_res[['ASIN', '売上', '数量']], on='ASIN', how='left', suffixes=('', '_過去')).fillna(0)
-        disp['MoM/YoY (%)'] = ((disp['売上'] / disp['売上_過去']) - 1) * 100
-        disp.loc[disp['売上_過去'] == 0, 'MoM/YoY (%)'] = 0
-        disp = disp[['ASIN', 'コード', '正式品名', '規格', '売上', '売上_過去', 'MoM/YoY (%)', '数量']]
-        disp.columns = ['ASIN', 'コード', '正式品名', '規格', '売上(現在)', '売上(比較)', 'MoM/YoY (%)', '数量']
-        fmt = {'売上(現在)': '¥{:,.0f}', '売上(比較)': '¥{:,.0f}', 'MoM/YoY (%)': '{:+.1f}%', '数量': '{:,.0f}'}
+        # 比較表の作成
+        disp = pd.merge(
+            main_res, 
+            comp_res[['ASIN', '売上', '数量']], 
+            on='ASIN', 
+            how='outer', 
+            suffixes=('', '_比較')
+        ).fillna(0)
+        
+        # 名前・コード・規格が消えないよう補完（outer join対策）
+        # ※本来はmain_resにあるはずだが、比較対象にしか存在しない商品があった場合のため
+        
+        disp['MoM/YoY (%)'] = ((disp['売上'] / disp['売上_比較']) - 1) * 100
+        disp.loc[disp['売上_比較'] == 0, 'MoM/YoY (%)'] = 0
+        
+        # 列名に年月を反映
+        label_now = f"売上({s_m}〜{e_m})"
+        label_comp = f"売上({cs_m}〜{ce_m})"
+        
+        disp = disp[['ASIN', 'コード', '正式品名', '規格', '売上', '売上_比較', 'MoM/YoY (%)', '数量']]
+        disp.columns = ['ASIN', 'コード', '正式品名', '規格', label_now, label_comp, 'MoM/YoY (%)', '数量']
+        fmt = {label_now: '¥{:,.0f}', label_comp: '¥{:,.0f}', 'MoM/YoY (%)': '{:+.1f}%', '数量': '{:,.0f}'}
     else:
-        m1.metric("合計売上", f"¥{int(val_now):,}")
+        m1.metric(f"合計売上 ({s_m}〜{e_m})", f"¥{int(val_now):,}")
         m2.metric("合計数量", f"{int(main_res['数量'].sum()):,}")
         disp = main_res[['ASIN', 'コード', '正式品名', '規格', '売上', '数量']]
         disp.columns = ['ASIN', 'コード', '正式品名', '規格', '売上', '数量']
@@ -124,6 +146,7 @@ try:
     
     search = st.text_input("クイック検索 (正式品名, コード, ASIN)", "").lower()
     if search:
+        # 検索対象列の特定（モードによって列名が変わるため商品名などで固定）
         disp = disp[disp['正式品名'].str.lower().str.contains(search, na=False) | 
                     disp['コード'].astype(str).str.contains(search, na=False) | 
                     disp['ASIN'].str.lower().str.contains(search, na=False)]
