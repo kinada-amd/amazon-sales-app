@@ -52,7 +52,7 @@ st.markdown("""
     /* 6. 表（DataFrame）内のフォント */
     .stDataFrame { font-family: 'Inter', sans-serif !important; }
     h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.02em !important; }
-    .st-emotion-cache-zy6yx3 {padding: 3rem 1rem 10rem;}
+    .st-emotion-cache-zy6yx3 {padding: 3rem 5rem 10rem;}
     </style>
     """, unsafe_allow_html=True)
 
