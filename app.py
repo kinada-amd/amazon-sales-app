@@ -39,9 +39,7 @@ def show_product_detail(asin, full_data, summary_row):
     st.subheader(f"{summary_row['正式品名']}")
     st.caption(f"ASIN: {asin} | 規格: {summary_row['規格']}")
     col_d1, col_d2 = st.columns([2, 1])
-    
     prod_trend = full_data[full_data['ASIN'] == asin].sort_values('日付_dt').tail(12)
-    
     with col_d1:
         fig = go.Figure()
         fig.add_trace(go.Scatter(
@@ -54,23 +52,10 @@ def show_product_detail(asin, full_data, summary_row):
             hovertemplate='<b>%{x|%Y年%m月}</b><br>売上: ¥%{y:,.0f}<br>数量: %{customdata:,.0f} 個<extra></extra>', 
         ))
         fig.update_layout(
-            title="直近12ヶ月の売上推移", 
-            height=350, 
-            plot_bgcolor='white', 
-            margin=dict(l=0,r=0,t=40,b=0),
-            xaxis=dict(
-                tickformat='%Y年%m月', 
-                dtick="M1",
-                showgrid=True, 
-                gridcolor='#F3F3F3'
-            ),
+            title="直近12ヶ月の売上推移", height=350, plot_bgcolor='white', margin=dict(l=0,r=0,t=40,b=0),
+            xaxis=dict(tickformat='%Y年%m月', dtick="M1", showgrid=True, gridcolor='#F3F3F3'),
             yaxis=dict(showgrid=True, gridcolor='#F3F3F3', tickformat=','),
-            hoverlabel=dict(
-                bgcolor="white",
-                font_size=18,
-                font_family="Inter",
-                bordercolor="#FF9900"
-            )
+            hoverlabel=dict(bgcolor="white", font_size=18, font_family="Inter", bordercolor="#FF9900")
         )
         st.plotly_chart(fig, use_container_width=True)
     with col_d2:
@@ -162,6 +147,7 @@ try:
 
     st.markdown("---")
     st.subheader("売上詳細分析")
+    st.info("ABCランク：売上貢献度(A=上位70%) / 季節性スコア：年間平均売上に対する当月の売上倍率")
     
     def style_table(v):
         if v == 'A': return 'color: #FF9900; font-weight: 800;'
@@ -174,10 +160,15 @@ try:
         disp.loc[disp['売上_c'] == 0, '売上MoM(%)'] = 0
         disp['数量MoM(%)'] = ((disp['数量'] / disp['数量_c']) - 1) * 100
         disp.loc[disp['数量_c'] == 0, '数量MoM(%)'] = 0
+        
         c1, c2 = f"売上({target_p})", f"売上({comp_p})"
+        c_q_n, c_q_p = f"数量({target_p})", f"数量({comp_p})"
+        
         disp = disp[['ABC', 'ASIN', '正式品名', '規格', '売上', '売上_c', '売上MoM(%)', '数量', '数量_c', '数量MoM(%)', '季節性']].copy()
-        disp.columns = ['ABC', 'ASIN', '正式品名', '規格', c1, c2, '売上MoM(%)', f"数量({target_p})", f"数量({comp_p})", '数量MoM(%)', '季節性']
-        fmt = {c1: '¥{:,.0f}', c2: '¥{:,.0f}', '売上MoM(%)': '{:+.1f}%', '数量MoM(%)': '{:+.1f}%', '季節性': '{:.2f}'}
+        disp.columns = ['ABC', 'ASIN', '正式品名', '規格', c1, c2, '売上MoM(%)', c_q_n, c_q_p, '数量MoM(%)', '季節性']
+        # フォーマット指定で数量(比較)も整数カンマ区切りに修正
+        fmt = {c1: '¥{:,.0f}', c2: '¥{:,.0f}', '売上MoM(%)': '{:+.1f}%', 
+               c_q_n: '{:,.0f}', c_q_p: '{:,.0f}', '数量MoM(%)': '{:+.1f}%', '季節性': '{:.2f}'}
     else:
         disp = sum_now[['ABC', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性']].copy()
         fmt = {'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性': '{:.2f}'}
