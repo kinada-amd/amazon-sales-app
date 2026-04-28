@@ -38,11 +38,39 @@ def show_product_detail(asin, full_data, summary_row):
     st.subheader(f"{summary_row['正式品名']}")
     st.caption(f"ASIN: {asin} | 規格: {summary_row['規格']}")
     col_d1, col_d2 = st.columns([2, 1])
+    
+    # データの準備
     prod_trend = full_data[full_data['ASIN'] == asin].sort_values('日付_dt').tail(12)
+    
     with col_d1:
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=prod_trend['年月'], y=prod_trend['売上'], mode='lines+markers', line=dict(color='#FF9900', width=3)))
-        fig.update_layout(title="直近12ヶ月の売上推移", height=350, plot_bgcolor='white', margin=dict(l=0,r=0,t=40,b=0))
+        fig.add_trace(go.Scatter(
+            x=prod_trend['日付_dt'], 
+            y=prod_trend['売上'], 
+            mode='lines+markers', 
+            line=dict(color='#FF9900', width=3),
+            marker=dict(size=8),
+            hovertemplate='<b>売上: ¥%{y:,.0f}</b><extra></extra>', 
+        ))
+        fig.update_layout(
+            title="直近12ヶ月の売上推移", 
+            height=350, 
+            plot_bgcolor='white', 
+            margin=dict(l=0,r=0,t=40,b=0),
+            xaxis=dict(
+                tickformat='%Y年%m月', 
+                dtick="M1",
+                showgrid=True, 
+                gridcolor='#F3F3F3'
+            ),
+            yaxis=dict(showgrid=True, gridcolor='#F3F3F3', tickformat=','),
+            hoverlabel=dict(
+                bgcolor="white",
+                font_size=24,
+                font_family="Inter",
+                bordercolor="#FF9900"
+            )
+        )
         st.plotly_chart(fig, use_container_width=True)
     with col_d2:
         st.write("**現在のステータス**")
@@ -174,7 +202,6 @@ try:
 
     except (ValueError, KeyError, pd.errors.AttributeError):
         st.warning("⚠️ **表示期間の設定を確認してください**")
-        st.info("「現在の期間」と「比較対象の期間」に同じ月や年度を選択すると、正しく表示できません。サイドバーから異なる期間を選び直してください。")
 
 except Exception as e:
     st.error(f"システムエラーが発生しました。設定を確認してください。")
