@@ -171,4 +171,7 @@ try:
 
     # 重複エラー回避のため一度インデックスを整理
     disp = disp.reset_index(drop=True)
-    st.dataframe(disp
+    st.dataframe(disp.style.format(fmt).map(style_table, subset=['ABCランク']), use_container_width=True, height=600)
+
+except Exception as e:
+    st.error(f"システムエラー: {e}")
