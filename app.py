@@ -24,11 +24,6 @@ st.markdown("""
     div[data-testid="stSelectbox"] div[data-baseweb="select"] div { color: #131921 !important; font-weight: 700 !important; }
     div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important; }
     h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.02em !important; }
-    
-    /* ABCランク用バッジスタイル */
-    .badge-a { background-color: #FF9900; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
-    .badge-b { background-color: #232F3E; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
-    .badge-c { background-color: #D5D9D9; color: #131921; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -75,21 +70,18 @@ try:
 
     df_f = pd.merge(df_s, df_m, on='ASIN', how='left').fillna({'コード':'N/A', '正式品名':'不明', '規格':'-'})
 
-    # --- 共通計算ロジック (ABC分析 & 季節性) ---
+    # --- 分析ロジック (ABC & 季節性) ---
     def add_analytics(df_base, df_target):
-        # ABC分析
         df_target = df_target.sort_values('売上', ascending=False)
         total_sales = df_target['売上'].sum()
         df_target['累計比率'] = df_target['売上'].cumsum() / total_sales if total_sales > 0 else 0
-        df_target['ABC'] = df_target['累計比率'].apply(lambda x: 'A' if x <= 0.7 else ('B' if x <= 0.9 else 'C'))
+        df_target['ABCランク'] = df_target['累計比率'].apply(lambda x: 'A' if x <= 0.7 else ('B' if x <= 0.9 else 'C'))
         
-        # 季節性スコア (選択月売上 / 商品別年間月平均売上)
-        # 12ヶ月分程度の平均をとる
+        # 季節性スコア
         avg_sales = df_base.groupby('ASIN')['売上'].mean().reset_index()
         avg_sales.columns = ['ASIN', '平均売上']
         df_target = pd.merge(df_target, avg_sales, on='ASIN', how='left')
-        df_target['季節性'] = (df_target['売上'] / df_target['平均売上']).fillna(0)
-        
+        df_target['季節性スコア'] = (df_target['売上'] / df_target['平均売上']).fillna(0)
         return df_target
 
     def filter_data(df, period):
@@ -99,7 +91,7 @@ try:
     main_sum = main_res_raw.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
     main_sum = add_analytics(df_f, main_sum)
 
-    # --- メインエリア ---
+    # --- メイン表示 ---
     st.title("Sales Performance Dashboard")
     m1, m2, m3 = st.columns(3)
     val_now = main_sum['売上'].sum()
@@ -113,12 +105,12 @@ try:
         m2.metric(f"売上 ({comp_p})", f"¥{int(val_prev):,}")
     else:
         m1.metric(f"売上 ({target_p})", f"¥{int(val_now):,}")
-        m2.metric("合計数量", f"{int(main_sum['数量'].sum()):,}")
+        m2.metric("合計数量", f"{int(main_res_raw['数量'].sum()):,}")
     m3.metric("商品数", f"{len(main_sum):,}")
 
-    # --- グラフセクション ---
+    # --- グラフ推移 ---
     if "年度" in target_p:
-        st.subheader(f"月別売上実績 推移")
+        st.subheader("月別売上実績 推移")
         month_order = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3]
         fig = go.Figure()
         now_trend = main_res_raw.groupby('月')['売上'].sum().reindex(month_order).fillna(0)
@@ -129,41 +121,43 @@ try:
         fig.update_layout(barmode='group', plot_bgcolor='white', height=350, margin=dict(l=0,r=0,t=20,b=0))
         st.plotly_chart(fig, use_container_width=True)
 
-    # --- 詳細テーブル ---
+    # --- 詳細テーブル（ABC & ヒートマップ） ---
     st.markdown("---")
     st.subheader("売上詳細分析")
 
-    # 比較モード用のデータ結合
+    # スタイル定義
+    def style_abc(val):
+        if val == 'A': return 'background-color: #FF9900; color: white; font-weight: 800; text-align: center;'
+        if val == 'B': return 'background-color: #232F3E; color: white; font-weight: 700; text-align: center;'
+        return 'background-color: #D5D9D9; color: #131921; text-align: center;'
+
     if mode == "比較モード" and comp_p:
         disp = pd.merge(main_sum, prev_sum[['ASIN', '売上', '数量']], on='ASIN', how='outer', suffixes=('', '_比較')).fillna(0)
-        disp['売上 MoM/YoY (%)'] = ((disp['売上'] / disp['売上_比較']) - 1) * 100
-        disp.loc[disp['売上_比較'] == 0, '売上 MoM/YoY (%)'] = 0
-        disp['数量 MoM/YoY (%)'] = ((disp['数量'] / disp['数量_比較']) - 1) * 100
-        disp.loc[disp['数量_比較'] == 0, '数量 MoM/YoY (%)'] = 0
+        disp['MoM/YoY(%)'] = ((disp['売上'] / disp['売上_比較']) - 1) * 100
+        disp.loc[disp['売上_比較'] == 0, 'MoM/YoY(%)'] = 0
         
         c1, c2 = f"売上({target_p})", f"売上({comp_p})"
-        disp = disp[['ABC', 'ASIN', '正式品名', '規格', '売上', '売上_比較', '売上 MoM/YoY (%)', '季節性']]
+        disp = disp[['ABCランク', 'ASIN', '正式品名', '規格', '売上', '売上_比較', 'MoM/YoY(%)', '季節性スコア']]
         disp.columns = ['ABCランク', 'ASIN', '正式品名', '規格', c1, c2, 'MoM/YoY(%)', '季節性スコア']
         
-        # 表示スタイルの設定
+        # Pandas 2.x対応: applymap -> map
         st.dataframe(
             disp.style.format({c1: '¥{:,.0f}', c2: '¥{:,.0f}', 'MoM/YoY(%)': '{:+.1f}%', '季節性スコア': '{:.2f}'})
             .background_gradient(subset=['MoM/YoY(%)'], cmap='RdYlGn')
             .background_gradient(subset=['季節性スコア'], cmap='Oranges')
-            .applymap(lambda x: 'font-weight: bold; color: #FF9900;' if x == 'A' else '', subset=['ABCランク']),
+            .map(style_abc, subset=['ABCランク']),
             use_container_width=True, height=600
         )
     else:
-        disp = main_sum[['ABC', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性']]
-        disp.columns = ['ABCランク', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性スコア']
+        disp = main_sum[['ABCランク', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性スコア']]
         
         st.dataframe(
             disp.style.format({'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性スコア': '{:.2f}'})
             .background_gradient(subset=['売上'], cmap='YlGnBu')
             .background_gradient(subset=['季節性スコア'], cmap='Oranges')
-            .applymap(lambda x: 'font-weight: bold; color: #FF9900;' if x == 'A' else '', subset=['ABCランク']),
+            .map(style_abc, subset=['ABCランク']),
             use_container_width=True, height=600
         )
 
 except Exception as e:
-    st.error(f"エラーが発生しました: {e}")
+    st.error(f"システムエラー: {e}")
