@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 # 1. ページ設定
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正
+# 2. デザイン修正（Amazonトーン＆マナー）
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
@@ -46,25 +46,31 @@ try:
     df_s['日付_dt'] = pd.to_datetime(df_s['日付'], format='%Y年%m月', errors='coerce')
     df_s['年月'] = df_s['日付_dt'].dt.strftime('%Y-%m')
     df_s['月'] = df_s['日付_dt'].dt.month
-    
-    # 年度計算 (4月開始)
     df_s['年度'] = df_s['日付_dt'].apply(lambda x: f"{str(x.year - 1)[2:]}年度" if x.month <= 3 else f"{str(x.year)[2:]}年度")
 
     all_months = sorted(df_s['年月'].dropna().unique(), reverse=True)
     all_years = sorted(df_s['年度'].dropna().unique(), reverse=True)
-    all_options = all_years + all_months
 
     # --- サイドバー ---
     st.sidebar.title("Amazon Analytics")
     mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"], key="mode")
     st.sidebar.markdown("---")
 
+    # 期間単位の選択UI（ここが今回のキモです）
+    unit = st.sidebar.radio("表示単位を選択", ["月単位", "年度単位"], horizontal=True)
+
     if mode == "通常モード":
-        target_p = st.sidebar.selectbox("表示する期間を選択", all_options, index=0, key="m1")
+        target_options = all_months if unit == "月単位" else all_years
+        target_p = st.sidebar.selectbox("表示する期間を選択", target_options, index=0, key="m1")
         comp_p = None
     else:
-        target_p = st.sidebar.selectbox("現在の期間（現在）", all_options, index=0, key="m2")
-        comp_p = st.sidebar.selectbox("比較する期間（比較）", all_options, index=min(1, len(all_options)-1), key="m3")
+        target_options = all_months if unit == "月単位" else all_years
+        target_p = st.sidebar.selectbox("現在の期間（現在）", target_options, index=0, key="m2")
+        
+        st.sidebar.markdown("---")
+        comp_unit = st.sidebar.radio("比較先の単位を選択", ["月単位", "年度単位"], horizontal=True, key="c_unit")
+        comp_options = all_months if comp_unit == "月単位" else all_years
+        comp_p = st.sidebar.selectbox("比較する期間（比較）", comp_options, index=min(1, len(comp_options)-1), key="m3")
 
     df_f = pd.merge(df_s, df_m, on='ASIN', how='left').fillna({'コード':'N/A', '正式品名':'不明', '規格':'-'})
 
@@ -79,7 +85,7 @@ try:
     m1, m2, m3 = st.columns(3)
     val_now = main_sum['売上'].sum()
 
-    if mode == "比較モード":
+    if mode == "比較モード" and comp_p:
         prev_res_raw = filter_data(df_f, comp_p)
         prev_sum = prev_res_raw.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
         val_prev = prev_sum['売上'].sum()
@@ -91,16 +97,12 @@ try:
         m2.metric("合計数量", f"{int(main_sum['数量'].sum()):,}")
     m3.metric("商品数", f"{len(main_sum):,}")
 
-    # --- グラフセクション (年度選択時のみ表示) ---
+    # --- グラフセクション ---
     if "年度" in target_p:
         st.subheader(f"月別売上実績 推移")
-        
-        # 4月から翌3月までの並び順を定義
         month_order = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3]
-        
         fig = go.Figure()
         
-        # 現在の年度データ
         now_trend = main_res_raw.groupby('月')['売上'].sum().reindex(month_order).fillna(0)
         fig.add_trace(go.Bar(
             x=[f"{m}月" for m in month_order], y=now_trend,
@@ -108,7 +110,6 @@ try:
             hovertemplate='売上: ¥%{y:,.0f}<extra></extra>'
         ))
         
-        # 比較対象の年度データ
         if mode == "比較モード" and comp_p and "年度" in comp_p:
             prev_trend = prev_res_raw.groupby('月')['売上'].sum().reindex(month_order).fillna(0)
             fig.add_trace(go.Bar(
@@ -116,7 +117,6 @@ try:
                 name=comp_p, marker_color='#A9A9A9',
                 hovertemplate='売上: ¥%{y:,.0f}<extra></extra>'
             ))
-
         fig.update_layout(
             barmode='group', plot_bgcolor='white', paper_bgcolor='white',
             margin=dict(l=0, r=0, t=20, b=0), height=400,
@@ -129,7 +129,7 @@ try:
     # --- 詳細テーブル ---
     st.markdown("---")
     st.subheader("売上詳細")
-    if mode == "比較モード":
+    if mode == "比較モード" and comp_p:
         disp = pd.merge(main_sum, prev_sum[['ASIN', '売上', '数量']], on='ASIN', how='outer', suffixes=('', '_比較')).fillna(0)
         disp['売上 MoM/YoY (%)'] = ((disp['売上'] / disp['売上_比較']) - 1) * 100
         disp.loc[disp['売上_比較'] == 0, '売上 MoM/YoY (%)'] = 0
@@ -137,14 +137,14 @@ try:
         disp.loc[disp['数量_比較'] == 0, '数量 MoM/YoY (%)'] = 0
         
         c1, c2 = f"売上({target_p})", f"売上({comp_p})"
-        c3, c4 = f"数量({target_p})", f"数量({comp_m if 'comp_m' in locals() else comp_p})"
+        c3, c4 = f"数量({target_p})", f"数量({comp_p})"
         disp = disp[['ASIN', 'コード', '正式品名', '規格', '売上', '売上_比較', '売上 MoM/YoY (%)', '数量', '数量_比較', '数量 MoM/YoY (%)']]
         disp.columns = ['ASIN', 'コード', '正式品名', '規格', c1, c2, '売上 MoM/YoY (%)', c3, c4, '数量 MoM/YoY (%)']
         fmt = {c1: '¥{:,.0f}', c2: '¥{:,.0f}', '売上 MoM/YoY (%)': '{:+.1f}%', c3: '{:,.0f}', c4: '{:,.0f}', '数量 MoM/YoY (%)': '{:+.1f}%'}
     else:
         disp = main_sum[['ASIN', 'コード', '正式品名', '規格', '売上', '数量']]
         disp.columns = ['ASIN', 'コード', '正式品名', '規格', f"売上({target_p})", '数量']
-        fmt = {f"売上({target_m if 'target_m' in locals() else target_p})": '¥{:,.0f}', '数量': '{:,.0f}'}
+        fmt = {f"売上({target_p})": '¥{:,.0f}', '数量': '{:,.0f}'}
 
     search = st.text_input("クイック検索 (正式品名, コード, ASIN)", "").lower()
     if search:
