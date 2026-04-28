@@ -46,18 +46,26 @@ def show_product_detail(asin, full_data, summary_row):
     
     with col_d1:
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=prod_trend['年月'], y=prod_trend['売上'], mode='lines+markers', line=dict(color='#FF9900', width=3)))
-        fig.update_layout(title="直近12ヶ月の売上推移", height=300, plot_bgcolor='white', margin=dict(l=0,r=0,t=30,b=0))
+        fig.add_trace(go.Scatter(
+            x=prod_trend['年月'], 
+            y=prod_trend['売上'], 
+            mode='lines+markers', 
+            line=dict(color='#FF9900', width=3),
+            hovertemplate='売上: ¥%{y:,.0f}<extra></extra>'
+        ))
+        fig.update_layout(title="直近12ヶ月の売上推移", height=350, plot_bgcolor='white', margin=dict(l=0,r=0,t=40,b=0))
         st.plotly_chart(fig, use_container_width=True)
     
     with col_d2:
         st.write("**現在のステータス**")
         st.metric("ABCランク", summary_row['ABC'])
         st.metric("季節性スコア", f"{summary_row['季節性']:.2f}")
+        
+        # 季節性に応じたアドバイス
         if summary_row['季節性'] > 1.2:
-            st.success("🔥 売上ピーク期です")
+            st.success("🔥 現在ハイシーズンです。在庫切れに注意してください。")
         elif summary_row['季節性'] < 0.8:
-            st.warning("❄️ 需要低下期です")
+            st.warning("❄️ 現在ローシーズンです。販促や在庫調整を検討してください。")
 
 try:
     # データ読み込み
@@ -91,6 +99,7 @@ try:
     else:
         opts = all_m if unit == "月単位" else all_y
         target_p = st.sidebar.selectbox("現在の期間（現在）", opts, index=0, key="m2")
+        st.sidebar.markdown("---")
         c_unit = st.sidebar.radio("比較先の単位を選択", ["月単位", "年度単位"], horizontal=True, key="cu")
         c_opts = all_m if c_unit == "月単位" else all_y
         comp_p = st.sidebar.selectbox("比較する期間（比較）", c_opts, index=min(1, len(c_opts)-1), key="m3")
@@ -136,7 +145,7 @@ try:
     # --- 詳細分析テーブル ---
     st.markdown("---")
     st.subheader("売上詳細分析")
-    st.info("表の左端にあるチェックをいれると、商品の詳細分析モーダルが開きます。")
+    st.info("表の左端にあるチェックボックスをクリックすると、商品詳細モーダルが表示されます。")
 
     def style_abc(v):
         if v == 'A': return 'color: #FF9900; font-weight: 800;'
@@ -162,22 +171,20 @@ try:
     if search:
         disp = disp[disp['正式品名'].str.lower().str.contains(search, na=False) | disp['ASIN'].str.lower().str.contains(search, na=False)]
 
-    # --- インタラクティブ・データフレーム ---
-    # on_select="rerun" を使うことで、行選択時にスクリプトを再実行してモーダルを出す
+    # --- インタラクティブ・データフレーム（修正済） ---
     event = st.dataframe(
         disp.style.format(fmt).map(style_abc, subset=['ABC']), 
         use_container_width=True, 
         height=600,
         hide_index=True,
         on_select="rerun",
-        selection_mode="single_row"
+        selection_mode="single-row" # アンダーバーをハイフンに修正
     )
 
     # 行が選択されたらモーダルを表示
     if event.selection.rows:
         selected_row_idx = event.selection.rows[0]
         selected_row_data = disp.iloc[selected_row_idx]
-        # モーダル関数を呼び出し
         show_product_detail(selected_row_data['ASIN'], df_f, selected_row_data)
 
 except Exception as e:
