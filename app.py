@@ -23,8 +23,12 @@ st.markdown("""
     div[data-baseweb="select"] > div { background-color: #FFFFFF !important; color: #131921 !important; border: 1px solid #D5D9D9 !important; }
     div[data-testid="stSelectbox"] div[data-baseweb="select"] div { color: #131921 !important; font-weight: 700 !important; }
     div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important; }
-    .stDataFrame { font-family: 'Inter', sans-serif !important; }
     h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.02em !important; }
+    
+    /* ABCランク用バッジスタイル */
+    .badge-a { background-color: #FF9900; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
+    .badge-b { background-color: #232F3E; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
+    .badge-c { background-color: #D5D9D9; color: #131921; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -55,8 +59,6 @@ try:
     st.sidebar.title("Amazon Analytics")
     mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"], key="mode")
     st.sidebar.markdown("---")
-
-    # 期間単位の選択UI（ここが今回のキモです）
     unit = st.sidebar.radio("表示単位を選択", ["月単位", "年度単位"], horizontal=True)
 
     if mode == "通常モード":
@@ -66,7 +68,6 @@ try:
     else:
         target_options = all_months if unit == "月単位" else all_years
         target_p = st.sidebar.selectbox("現在の期間（現在）", target_options, index=0, key="m2")
-        
         st.sidebar.markdown("---")
         comp_unit = st.sidebar.radio("比較先の単位を選択", ["月単位", "年度単位"], horizontal=True, key="c_unit")
         comp_options = all_months if comp_unit == "月単位" else all_years
@@ -74,11 +75,29 @@ try:
 
     df_f = pd.merge(df_s, df_m, on='ASIN', how='left').fillna({'コード':'N/A', '正式品名':'不明', '規格':'-'})
 
+    # --- 共通計算ロジック (ABC分析 & 季節性) ---
+    def add_analytics(df_base, df_target):
+        # ABC分析
+        df_target = df_target.sort_values('売上', ascending=False)
+        total_sales = df_target['売上'].sum()
+        df_target['累計比率'] = df_target['売上'].cumsum() / total_sales if total_sales > 0 else 0
+        df_target['ABC'] = df_target['累計比率'].apply(lambda x: 'A' if x <= 0.7 else ('B' if x <= 0.9 else 'C'))
+        
+        # 季節性スコア (選択月売上 / 商品別年間月平均売上)
+        # 12ヶ月分程度の平均をとる
+        avg_sales = df_base.groupby('ASIN')['売上'].mean().reset_index()
+        avg_sales.columns = ['ASIN', '平均売上']
+        df_target = pd.merge(df_target, avg_sales, on='ASIN', how='left')
+        df_target['季節性'] = (df_target['売上'] / df_target['平均売上']).fillna(0)
+        
+        return df_target
+
     def filter_data(df, period):
         return df[df['年度'] == period] if "年度" in period else df[df['年月'] == period]
 
     main_res_raw = filter_data(df_f, target_p)
     main_sum = main_res_raw.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
+    main_sum = add_analytics(df_f, main_sum)
 
     # --- メインエリア ---
     st.title("Sales Performance Dashboard")
@@ -102,33 +121,19 @@ try:
         st.subheader(f"月別売上実績 推移")
         month_order = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3]
         fig = go.Figure()
-        
         now_trend = main_res_raw.groupby('月')['売上'].sum().reindex(month_order).fillna(0)
-        fig.add_trace(go.Bar(
-            x=[f"{m}月" for m in month_order], y=now_trend,
-            name=target_p, marker_color='#FF9900',
-            hovertemplate='売上: ¥%{y:,.0f}<extra></extra>'
-        ))
-        
+        fig.add_trace(go.Bar(x=[f"{m}月" for m in month_order], y=now_trend, name=target_p, marker_color='#FF9900'))
         if mode == "比較モード" and comp_p and "年度" in comp_p:
             prev_trend = prev_res_raw.groupby('月')['売上'].sum().reindex(month_order).fillna(0)
-            fig.add_trace(go.Bar(
-                x=[f"{m}月" for m in month_order], y=prev_trend,
-                name=comp_p, marker_color='#A9A9A9',
-                hovertemplate='売上: ¥%{y:,.0f}<extra></extra>'
-            ))
-        fig.update_layout(
-            barmode='group', plot_bgcolor='white', paper_bgcolor='white',
-            margin=dict(l=0, r=0, t=20, b=0), height=400,
-            xaxis=dict(showline=True, linecolor='#D5D9D9'),
-            yaxis=dict(showgrid=True, gridcolor='#F3F3F3', tickformat=',', title="売上(¥)"),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
+            fig.add_trace(go.Bar(x=[f"{m}月" for m in month_order], y=prev_trend, name=comp_p, marker_color='#A9A9A9'))
+        fig.update_layout(barmode='group', plot_bgcolor='white', height=350, margin=dict(l=0,r=0,t=20,b=0))
         st.plotly_chart(fig, use_container_width=True)
 
     # --- 詳細テーブル ---
     st.markdown("---")
-    st.subheader("売上詳細")
+    st.subheader("売上詳細分析")
+
+    # 比較モード用のデータ結合
     if mode == "比較モード" and comp_p:
         disp = pd.merge(main_sum, prev_sum[['ASIN', '売上', '数量']], on='ASIN', how='outer', suffixes=('', '_比較')).fillna(0)
         disp['売上 MoM/YoY (%)'] = ((disp['売上'] / disp['売上_比較']) - 1) * 100
@@ -137,21 +142,28 @@ try:
         disp.loc[disp['数量_比較'] == 0, '数量 MoM/YoY (%)'] = 0
         
         c1, c2 = f"売上({target_p})", f"売上({comp_p})"
-        c3, c4 = f"数量({target_p})", f"数量({comp_p})"
-        disp = disp[['ASIN', 'コード', '正式品名', '規格', '売上', '売上_比較', '売上 MoM/YoY (%)', '数量', '数量_比較', '数量 MoM/YoY (%)']]
-        disp.columns = ['ASIN', 'コード', '正式品名', '規格', c1, c2, '売上 MoM/YoY (%)', c3, c4, '数量 MoM/YoY (%)']
-        fmt = {c1: '¥{:,.0f}', c2: '¥{:,.0f}', '売上 MoM/YoY (%)': '{:+.1f}%', c3: '{:,.0f}', c4: '{:,.0f}', '数量 MoM/YoY (%)': '{:+.1f}%'}
+        disp = disp[['ABC', 'ASIN', '正式品名', '規格', '売上', '売上_比較', '売上 MoM/YoY (%)', '季節性']]
+        disp.columns = ['ABCランク', 'ASIN', '正式品名', '規格', c1, c2, 'MoM/YoY(%)', '季節性スコア']
+        
+        # 表示スタイルの設定
+        st.dataframe(
+            disp.style.format({c1: '¥{:,.0f}', c2: '¥{:,.0f}', 'MoM/YoY(%)': '{:+.1f}%', '季節性スコア': '{:.2f}'})
+            .background_gradient(subset=['MoM/YoY(%)'], cmap='RdYlGn')
+            .background_gradient(subset=['季節性スコア'], cmap='Oranges')
+            .applymap(lambda x: 'font-weight: bold; color: #FF9900;' if x == 'A' else '', subset=['ABCランク']),
+            use_container_width=True, height=600
+        )
     else:
-        disp = main_sum[['ASIN', 'コード', '正式品名', '規格', '売上', '数量']]
-        disp.columns = ['ASIN', 'コード', '正式品名', '規格', f"売上({target_p})", '数量']
-        fmt = {f"売上({target_p})": '¥{:,.0f}', '数量': '{:,.0f}'}
-
-    search = st.text_input("クイック検索 (正式品名, コード, ASIN)", "").lower()
-    if search:
-        disp = disp[disp['正式品名'].str.lower().str.contains(search, na=False) | 
-                    disp['コード'].astype(str).str.contains(search, na=False) | 
-                    disp['ASIN'].str.lower().str.contains(search, na=False)]
-    st.dataframe(disp.style.format(fmt), use_container_width=True, height=600)
+        disp = main_sum[['ABC', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性']]
+        disp.columns = ['ABCランク', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性スコア']
+        
+        st.dataframe(
+            disp.style.format({'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性スコア': '{:.2f}'})
+            .background_gradient(subset=['売上'], cmap='YlGnBu')
+            .background_gradient(subset=['季節性スコア'], cmap='Oranges')
+            .applymap(lambda x: 'font-weight: bold; color: #FF9900;' if x == 'A' else '', subset=['ABCランク']),
+            use_container_width=True, height=600
+        )
 
 except Exception as e:
     st.error(f"エラーが発生しました: {e}")
