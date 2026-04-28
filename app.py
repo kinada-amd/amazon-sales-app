@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 # 1. ページ設定
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正（Amazonトンマナ & 文字色バグ完全固定）
+# 2. デザイン修正
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
@@ -33,46 +33,26 @@ def load_data(url):
     res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
     return io.BytesIO(res.content)
 
-# --- 詳細表示用モーダル関数の定義 ---
 @st.dialog("商品詳細分析", width="large")
 def show_product_detail(asin, full_data, summary_row):
     st.subheader(f"{summary_row['正式品名']}")
     st.caption(f"ASIN: {asin} | 規格: {summary_row['規格']}")
-    
     col_d1, col_d2 = st.columns([2, 1])
-    
-    # 過去12ヶ月の推移
     prod_trend = full_data[full_data['ASIN'] == asin].sort_values('日付_dt').tail(12)
-    
     with col_d1:
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=prod_trend['年月'], 
-            y=prod_trend['売上'], 
-            mode='lines+markers', 
-            line=dict(color='#FF9900', width=3),
-            hovertemplate='売上: ¥%{y:,.0f}<extra></extra>'
-        ))
+        fig.add_trace(go.Scatter(x=prod_trend['年月'], y=prod_trend['売上'], mode='lines+markers', line=dict(color='#FF9900', width=3)))
         fig.update_layout(title="直近12ヶ月の売上推移", height=350, plot_bgcolor='white', margin=dict(l=0,r=0,t=40,b=0))
         st.plotly_chart(fig, use_container_width=True)
-    
     with col_d2:
         st.write("**現在のステータス**")
         st.metric("ABCランク", summary_row['ABC'])
         st.metric("季節性スコア", f"{summary_row['季節性']:.2f}")
-        
-        # 季節性に応じたアドバイス
-        if summary_row['季節性'] > 1.2:
-            st.success("🔥 現在ハイシーズンです。在庫切れに注意してください。")
-        elif summary_row['季節性'] < 0.8:
-            st.warning("❄️ 現在ローシーズンです。販促や在庫調整を検討してください。")
 
 try:
-    # データ読み込み
     df_m = pd.read_excel(load_data("http://gigaplus.makeshop.jp/aimedia/data/master.xlsx"))
     df_s = pd.read_excel(load_data("http://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"))
 
-    # クレンジング
     df_s.columns = df_s.columns.str.strip()
     df_m.columns = df_m.columns.str.strip()
     for c in ['売上', '数量']:
@@ -87,7 +67,6 @@ try:
     all_m = sorted(df_s['年月'].dropna().unique(), reverse=True)
     all_y = sorted(df_s['年度'].dropna().unique(), reverse=True)
 
-    # --- サイドバー ---
     st.sidebar.title("Amazon Analytics")
     mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"], key="mode")
     unit = st.sidebar.radio("表示単位を選択", ["月単位", "年度単位"], horizontal=True)
@@ -106,7 +85,6 @@ try:
 
     df_f = pd.merge(df_s, df_m, on='ASIN', how='left').fillna({'コード':'N/A', '正式品名':'不明', '規格':'-'})
 
-    # --- 分析関数 ---
     def get_ana(df_b, df_t):
         df_t = df_t.sort_values('売上', ascending=False).reset_index(drop=True)
         tot = df_t['売上'].sum()
@@ -125,7 +103,6 @@ try:
     sum_now = raw_now.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
     sum_now = get_ana(df_f, sum_now)
 
-    # --- メインサマリー ---
     st.title("Sales Performance Dashboard")
     m1, m2, m3 = st.columns(3)
     v_now = sum_now['売上'].sum()
@@ -142,12 +119,22 @@ try:
         m2.metric("合計数量", f"{int(sum_now['数量'].sum()):,}")
     m3.metric("商品数", f"{len(sum_now):,}")
 
-    # --- 詳細分析テーブル ---
+    if "年度" in target_p:
+        st.subheader("月別売上実績 推移")
+        mo = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3]
+        fig = go.Figure()
+        tr_now = raw_now.groupby('月')['売上'].sum().reindex(mo).fillna(0)
+        fig.add_trace(go.Bar(x=[f"{m}月" for m in mo], y=tr_now, name=target_p, marker_color='#FF9900'))
+        if mode == "比較モード" and comp_p and "年度" in comp_p:
+            tr_prev = raw_prev.groupby('月')['売上'].sum().reindex(mo).fillna(0)
+            fig.add_trace(go.Bar(x=[f"{m}月" for m in mo], y=tr_prev, name=comp_p, marker_color='#A9A9A9'))
+        fig.update_layout(barmode='group', plot_bgcolor='white', height=350, margin=dict(l=0,r=0,t=20,b=0))
+        st.plotly_chart(fig, use_container_width=True)
+
     st.markdown("---")
     st.subheader("売上詳細分析")
-    st.info("表の左端にあるチェックボックスをクリックすると、商品詳細モーダルが表示されます。")
-
-    def style_abc(v):
+    
+    def style_table(v):
         if v == 'A': return 'color: #FF9900; font-weight: 800;'
         if v == 'B': return 'color: #232F3E; font-weight: 700;'
         return 'color: #D5D9D9;'
@@ -158,7 +145,6 @@ try:
         disp.loc[disp['売上_c'] == 0, '売上MoM(%)'] = 0
         disp['数量MoM(%)'] = ((disp['数量'] / disp['数量_c']) - 1) * 100
         disp.loc[disp['数量_c'] == 0, '数量MoM(%)'] = 0
-        
         c1, c2 = f"売上({target_p})", f"売上({comp_p})"
         disp = disp[['ABC', 'ASIN', '正式品名', '規格', '売上', '売上_c', '売上MoM(%)', '数量', '数量_c', '数量MoM(%)', '季節性']].copy()
         disp.columns = ['ABC', 'ASIN', '正式品名', '規格', c1, c2, '売上MoM(%)', f"数量({target_p})", f"数量({comp_p})", '数量MoM(%)', '季節性']
@@ -171,21 +157,24 @@ try:
     if search:
         disp = disp[disp['正式品名'].str.lower().str.contains(search, na=False) | disp['ASIN'].str.lower().str.contains(search, na=False)]
 
-    # --- インタラクティブ・データフレーム（修正済） ---
-    event = st.dataframe(
-        disp.style.format(fmt).map(style_abc, subset=['ABC']), 
-        use_container_width=True, 
-        height=600,
-        hide_index=True,
-        on_select="rerun",
-        selection_mode="single-row" # アンダーバーをハイフンに修正
-    )
+    try:
+        disp = disp.reset_index(drop=True)
+        event = st.dataframe(
+            disp.style.format(fmt).map(style_table, subset=['ABC']), 
+            use_container_width=True, 
+            height=600,
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row"
+        )
+        if event.selection.rows:
+            selected_row_idx = event.selection.rows[0]
+            selected_row_data = disp.iloc[selected_row_idx]
+            show_product_detail(selected_row_data['ASIN'], df_f, selected_row_data)
 
-    # 行が選択されたらモーダルを表示
-    if event.selection.rows:
-        selected_row_idx = event.selection.rows[0]
-        selected_row_data = disp.iloc[selected_row_idx]
-        show_product_detail(selected_row_data['ASIN'], df_f, selected_row_data)
+    except (ValueError, KeyError, pd.errors.AttributeError):
+        st.warning("⚠️ **表示期間の設定を確認してください**")
+        st.info("「現在の期間」と「比較対象の期間」に同じ月や年度を選択すると、正しく表示できません。サイドバーから異なる期間を選び直してください。")
 
 except Exception as e:
-    st.error(f"システムエラー: {e}")
+    st.error(f"システムエラーが発生しました。設定を確認してください。")
