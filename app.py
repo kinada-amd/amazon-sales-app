@@ -7,47 +7,26 @@ import plotly.graph_objects as go
 # 1. ページ設定
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正（Amazonトーン＆マナー / 検索窓視認性固定）
+# 2. デザイン修正（Amazonトンマナ & 選択行ハイライト）
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
-    
-    /* 検索窓の文字色を強制的に黒に */
     input { color: #131921 !important; }
-    
     html, body, [data-testid="stAppViewContainer"], .stApp {
         background-color: #FFFFFF !important;
         color: #131921 !important;
         font-family: 'Inter', sans-serif !important;
     }
-
-    [data-testid="stHeader"] { 
-        background-color: rgba(255, 255, 255, 0) !important; 
-        color: #131921 !important;
-    }
     #MainMenu, footer { visibility: hidden !important; }
-
     [data-testid="stSidebar"] { background-color: #131921 !important; }
     [data-testid="stSidebar"] * { color: #FFFFFF !important; }
-
     div[data-baseweb="select"] > div {
-        background-color: #FFFFFF !important;
-        color: #131921 !important;
-        border: 1px solid #D5D9D9 !important;
+        background-color: #FFFFFF !important; color: #131921 !important; border: 1px solid #D5D9D9 !important;
     }
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] div {
-        color: #131921 !important;
-        font-weight: 700 !important;
-    }
-
     div[data-testid="stMetricValue"] {
-        color: #131921 !important;
-        font-weight: 800 !important;
-        letter-spacing: -0.03em !important;
+        color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important;
     }
-
-    h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.02em !important; }
-    .st-emotion-cache-zy6yx3 {padding: 3rem 5rem 10rem;}
+    h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -74,7 +53,6 @@ try:
     all_m = sorted(df_s['年月'].dropna().unique(), reverse=True)
     all_y = sorted(df_s['年度'].dropna().unique(), reverse=True)
 
-    # --- サイドバー ---
     st.sidebar.title("Amazon Analytics")
     mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"], key="mode")
     st.sidebar.markdown("---")
@@ -94,7 +72,6 @@ try:
 
     df_f = pd.merge(df_s, df_m, on='ASIN', how='left').fillna({'コード':'N/A', '正式品名':'不明', '規格':'-'})
 
-    # --- 分析関数 ---
     def get_ana(df_b, df_t):
         df_t = df_t.sort_values('売上', ascending=False).reset_index(drop=True)
         tot = df_t['売上'].sum()
@@ -113,7 +90,6 @@ try:
     sum_now = raw_now.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
     sum_now = get_ana(df_f, sum_now)
 
-    # --- メインエリア ---
     st.title("Sales Performance Dashboard")
     m1, m2, m3 = st.columns(3)
     v_now = sum_now['売上'].sum()
@@ -130,65 +106,83 @@ try:
         m2.metric("合計数量", f"{int(sum_now['数量'].sum()):,}")
     m3.metric("商品数", f"{len(sum_now):,}")
 
-    if "年度" in target_p:
-        st.subheader("月別売上実績 推移")
-        mo = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3]
-        fig = go.Figure()
-        tr_now = raw_now.groupby('月')['売上'].sum().reindex(mo).fillna(0)
-        fig.add_trace(go.Bar(x=[f"{m}月" for m in mo], y=tr_now, name=target_p, marker_color='#FF9900'))
-        if mode == "比較モード" and comp_p and "年度" in comp_p:
-            tr_prev = raw_prev.groupby('月')['売上'].sum().reindex(mo).fillna(0)
-            fig.add_trace(go.Bar(x=[f"{m}月" for m in mo], y=tr_prev, name=comp_p, marker_color='#A9A9A9'))
-        fig.update_layout(barmode='group', plot_bgcolor='white', height=350, margin=dict(l=0,r=0,t=20,b=0))
-        st.plotly_chart(fig, use_container_width=True)
+    # --- 商品詳細ドリルダウン機能 ---
+    st.markdown("---")
+    st.subheader("商品詳細ドリルダウン")
+    
+    # 選択用のリスト作成
+    selected_asin = st.selectbox(
+        "分析する商品を選択してください（商品名またはASINで検索可能）",
+        options=sum_now['ASIN'].tolist(),
+        format_func=lambda x: f"{sum_now[sum_now['ASIN']==x]['正式品名'].values[0]} ({x})",
+        key="asin_selector"
+    )
 
-    # --- 表のスタイル ---
+    if selected_asin:
+        col_d1, col_d2 = st.columns([2, 1])
+        
+        # 選択商品の時系列データ抽出（直近12ヶ月分）
+        prod_trend = df_f[df_f['ASIN'] == selected_asin].sort_values('日付_dt').tail(12)
+        prod_info = sum_now[sum_now['ASIN'] == selected_asin].iloc[0]
+
+        with col_d1:
+            fig_prod = go.Figure()
+            fig_prod.add_trace(go.Scatter(
+                x=prod_trend['年月'], y=prod_trend['売上'],
+                mode='lines+markers', name='売上推移',
+                line=dict(color='#FF9900', width=4),
+                marker=dict(size=10)
+            ))
+            fig_prod.update_layout(
+                title=f"直近12ヶ月の売上推移: {prod_info['正式品名'][:30]}...",
+                plot_bgcolor='white', height=350, margin=dict(l=0,r=0,t=40,b=0),
+                yaxis=dict(showgrid=True, gridcolor='#F3F3F3', tickformat=',')
+            )
+            st.plotly_chart(fig_prod, use_container_width=True)
+
+        with col_d2:
+            st.write(f"**商品分析スコア**")
+            st.info(f"""
+            - **ランク**: {prod_info['ABC']}ランク
+            - **季節性スコア**: {prod_info['季節性']:.2f}
+            - **現在の数量**: {int(prod_info['数量']):,}
+            """)
+            if prod_info['季節性'] > 1.2:
+                st.success("🔥 現在ハイシーズンです。在庫切れに注意してください。")
+            elif prod_info['季節性'] < 0.8:
+                st.warning("❄️ 現在ローシーズンです。販促を検討してください。")
+
+    # --- 売上詳細分析テーブル ---
+    st.markdown("---")
+    st.subheader("売上詳細分析")
+    
     def style_table(v):
         if v == 'A': return 'color: #FF9900; font-weight: 800;'
         if v == 'B': return 'color: #232F3E; font-weight: 700;'
         return 'color: #D5D9D9;'
 
-    st.markdown("---")
-    st.subheader("売上詳細分析")
-    st.info("ABCランク：売上貢献度(A=上位70%) / 季節性スコア：年間平均との倍率")
-
     if mode == "比較モード" and comp_p:
-        # 売上と比較対象をマージ
         disp = pd.merge(sum_now, sum_prev[['ASIN', '売上', '数量']], on='ASIN', how='left', suffixes=('', '_c')).fillna(0)
-        
-        # 売上のMoM/YoY
         disp['売上MoM(%)'] = ((disp['売上'] / disp['売上_c']) - 1) * 100
         disp.loc[disp['売上_c'] == 0, '売上MoM(%)'] = 0
-        
-        # 数量のMoM/YoY
         disp['数量MoM(%)'] = ((disp['数量'] / disp['数量_c']) - 1) * 100
         disp.loc[disp['数量_c'] == 0, '数量MoM(%)'] = 0
 
         c_s_n, c_s_p = f"売上({target_p})", f"売上({comp_p})"
         c_q_n, c_q_p = f"数量({target_p})", f"数量({comp_p})"
-        
-        # 列の並び替え
         disp = disp[['ABC', 'ASIN', '正式品名', '規格', '売上', '売上_c', '売上MoM(%)', '数量', '数量_c', '数量MoM(%)', '季節性']].copy()
-        disp.columns = ['ABCランク', 'ASIN', '正式品名', '規格', c_s_n, c_s_p, '売上MoM(%)', c_q_n, c_q_p, '数量MoM(%)', '季節性スコア']
-        fmt = {c_s_n: '¥{:,.0f}', c_s_p: '¥{:,.0f}', '売上MoM(%)': '{:+.1f}%', 
-               c_q_n: '{:,.0f}', c_q_p: '{:,.0f}', '数量MoM(%)': '{:+.1f}%', '季節性スコア': '{:.2f}'}
+        disp.columns = ['ABC', 'ASIN', '正式品名', '規格', c_s_n, c_s_p, '売上MoM(%)', c_q_n, c_q_p, '数量MoM(%)', '季節性']
+        fmt = {c_s_n: '¥{:,.0f}', c_s_p: '¥{:,.0f}', '売上MoM(%)': '{:+.1f}%', c_q_n: '{:,.0f}', c_q_p: '{:,.0f}', '数量MoM(%)': '{:+.1f}%', '季節性': '{:.2f}'}
     else:
         disp = sum_now[['ABC', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性']].copy()
-        disp.columns = ['ABCランク', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性スコア']
-        fmt = {'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性スコア': '{:.2f}'}
+        disp.columns = ['ABC', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性']
+        fmt = {'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性': '{:.2f}'}
 
     search = st.text_input("検索 (正式品名, ASIN)", "").lower()
     if search:
         disp = disp[disp['正式品名'].str.lower().str.contains(search, na=False) | disp['ASIN'].str.lower().str.contains(search, na=False)]
 
-    # 重複エラー回避のため一度インデックスを整理
-    disp = disp.reset_index(drop=True)
-    st.dataframe(
-        disp.style.format(fmt).map(style_table, subset=['ABCランク']), 
-        use_container_width=True, 
-        height=600,
-        hide_index=True  # 左側の行番号を削除
-    )
+    st.dataframe(disp.style.format(fmt).map(style_table, subset=['ABC']), use_container_width=True, height=500, hide_index=True)
 
 except Exception as e:
     st.error(f"システムエラー: {e}")
