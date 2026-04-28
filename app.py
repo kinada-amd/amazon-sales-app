@@ -39,7 +39,6 @@ def show_product_detail(asin, full_data, summary_row):
     st.caption(f"ASIN: {asin} | 規格: {summary_row['規格']}")
     col_d1, col_d2 = st.columns([2, 1])
     
-    # データの準備
     prod_trend = full_data[full_data['ASIN'] == asin].sort_values('日付_dt').tail(12)
     
     with col_d1:
@@ -47,10 +46,11 @@ def show_product_detail(asin, full_data, summary_row):
         fig.add_trace(go.Scatter(
             x=prod_trend['日付_dt'], 
             y=prod_trend['売上'], 
+            customdata=prod_trend['数量'],
             mode='lines+markers', 
             line=dict(color='#FF9900', width=3),
             marker=dict(size=8),
-            hovertemplate='<b>売上: ¥%{y:,.0f}</b><extra></extra>', 
+            hovertemplate='<b>%{x|%Y年%m月}</b><br>売上: ¥%{y:,.0f}<br>数量: %{customdata:,.0f} 個<extra></extra>', 
         ))
         fig.update_layout(
             title="直近12ヶ月の売上推移", 
@@ -66,7 +66,7 @@ def show_product_detail(asin, full_data, summary_row):
             yaxis=dict(showgrid=True, gridcolor='#F3F3F3', tickformat=','),
             hoverlabel=dict(
                 bgcolor="white",
-                font_size=24,
+                font_size=18,
                 font_family="Inter",
                 bordercolor="#FF9900"
             )
@@ -200,7 +200,7 @@ try:
             selected_row_data = disp.iloc[selected_row_idx]
             show_product_detail(selected_row_data['ASIN'], df_f, selected_row_data)
 
-    except (ValueError, KeyError, pd.errors.AttributeError):
+    except Exception:
         st.warning("⚠️ **表示期間の設定を確認してください**")
 
 except Exception as e:
