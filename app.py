@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 # 1. ページ設定
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正（Amazonトーン＆マナー / 各種バグ修正維持）
+# 2. デザイン修正
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
@@ -162,8 +162,6 @@ try:
 
     st.markdown("---")
     st.subheader("売上詳細分析")
-    # --- 【用語説明（復活）】 ---
-    st.info("ABCランク：売上貢献度(A=上位70%) / 季節性スコア：年間平均売上に対する当月の売上倍率")
     
     def style_table(v):
         if v == 'A': return 'color: #FF9900; font-weight: 800;'
