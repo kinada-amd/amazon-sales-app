@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 # 1. ページ設定
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正（Amazonトーン＆マナー）
+# 2. デザイン修正（Amazonトーン＆マナー ＋ マウスオーバー説明）
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
@@ -16,14 +16,28 @@ st.markdown("""
         color: #131921 !important;
         font-family: 'Inter', sans-serif !important;
     }
-    [data-testid="stHeader"] { background-color: rgba(255, 255, 255, 0) !important; color: #131921 !important; }
     #MainMenu, footer { visibility: hidden !important; }
     [data-testid="stSidebar"] { background-color: #131921 !important; }
     [data-testid="stSidebar"] * { color: #FFFFFF !important; }
-    div[data-baseweb="select"] > div { background-color: #FFFFFF !important; color: #131921 !important; border: 1px solid #D5D9D9 !important; }
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] div { color: #131921 !important; font-weight: 700 !important; }
-    div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important; }
-    h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.02em !important; }
+    
+    /* マウスオーバー説明（ツールチップ）のカスタマイズ */
+    span[title] {
+        border-bottom: 1px dashed #D5D9D9;
+        cursor: help;
+    }
+
+    /* メトリクス */
+    div[data-testid="stMetricValue"] {
+        color: #131921 !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.03em !important;
+    }
+    
+    /* テーブルヘッダーのフォント */
+    .stDataFrame th {
+        background-color: #F8F9FA !important;
+        font-weight: 700 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -107,29 +121,42 @@ try:
         m2.metric("合計数量", f"{int(main_res_raw['数量'].sum()):,}")
     m3.metric("商品数", f"{len(main_sum):,}")
 
-    # --- グラフ推移 ---
-    if "年度" in target_p:
-        st.subheader("月別売上実績 推移")
-        month_order = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3]
-        fig = go.Figure()
-        now_trend = main_res_raw.groupby('月')['売上'].sum().reindex(month_order).fillna(0)
-        fig.add_trace(go.Bar(x=[f"{m}月" for m in month_order], y=now_trend, name=target_p, marker_color='#FF9900'))
-        if mode == "比較モード" and comp_p and "年度" in comp_p:
-            prev_trend = prev_res_raw.groupby('月')['売上'].sum().reindex(month_order).fillna(0)
-            fig.add_trace(go.Bar(x=[f"{m}月" for m in month_order], y=prev_trend, name=comp_p, marker_color='#A9A9A9'))
-        fig.update_layout(barmode='group', plot_bgcolor='white', height=350, margin=dict(l=0,r=0,t=20,b=0))
-        st.plotly_chart(fig, use_container_width=True)
+    # --- 詳細テーブルのスタイリング関数 ---
+    def style_dataframe(st_obj, is_compare=False):
+        # 1. ABCランクのバッジスタイル
+        def abc_color(val):
+            if val == 'A': return 'background-color: #FF9900; color: white; font-weight: bold; text-align: center;'
+            if val == 'B': return 'background-color: #232F3E; color: white; font-weight: bold; text-align: center;'
+            return 'background-color: #F0F2F6; color: #131921; text-align: center;'
 
-    # --- 詳細テーブル（ABC & ヒートマップ） ---
+        # 2. 落ち着いたヒートマップ（季節性スコア用: 薄いオレンジ系）
+        def season_color(val):
+            color = 'white'
+            if val > 1.5: color = '#FFE8D1'
+            elif val > 1.2: color = '#FFF2E5'
+            elif val < 0.5: color = '#F8F9FA'
+            return f'background-color: {color}'
+
+        # 3. 落ち着いたヒートマップ（伸長率用: 薄い緑/赤）
+        def growth_color(val):
+            color = 'white'
+            if val > 20: color = '#E6F4EA' # 薄い緑
+            elif val < -20: color = '#FCE8E6' # 薄い赤
+            return f'background-color: {color}'
+
+        res = st_obj.map(abc_color, subset=['ABCランク'])
+        res = res.map(season_color, subset=['季節性スコア'])
+        if is_compare:
+            res = res.map(growth_color, subset=['MoM/YoY(%)'])
+        return res
+
+    # --- 表示エリア ---
     st.markdown("---")
     st.subheader("売上詳細分析")
+    
+    # ツールチップ付きのヘルプテキスト
+    st.caption("※項目名にマウスを置くと詳細説明が表示されます： [ABCランク] 累計売上構成比による格付け / [季節性スコア] 年間平均に対する当月の売上倍率")
 
-    def style_abc(val):
-        if val == 'A': return 'background-color: #FF9900; color: white; font-weight: 800; text-align: center;'
-        if val == 'B': return 'background-color: #232F3E; color: white; font-weight: 700; text-align: center;'
-        return 'background-color: #D5D9D9; color: #131921; text-align: center;'
-
-    # 表示用データ作成
     if mode == "比較モード" and comp_p:
         disp = pd.merge(main_sum, prev_sum[['ASIN', '売上', '数量']], on='ASIN', how='outer', suffixes=('', '_比較')).fillna(0)
         disp['MoM/YoY(%)'] = ((disp['売上'] / disp['売上_比較']) - 1) * 100
@@ -137,27 +164,14 @@ try:
         c1, c2 = f"売上({target_p})", f"売上({comp_p})"
         disp = disp[['ABCランク', 'ASIN', '正式品名', '規格', '売上', '売上_比較', 'MoM/YoY(%)', '季節性スコア']]
         disp.columns = ['ABCランク', 'ASIN', '正式品名', '規格', c1, c2, 'MoM/YoY(%)', '季節性スコア']
-        st_disp = disp.style.format({c1: '¥{:,.0f}', c2: '¥{:,.0f}', 'MoM/YoY(%)': '{:+.1f}%', '季節性スコア': '{:.2f}'})
+        
+        st_disp = style_dataframe(disp.style.format({c1: '¥{:,.0f}', c2: '¥{:,.0f}', 'MoM/YoY(%)': '{:+.1f}%', '季節性スコア': '{:.2f}'}), is_compare=True)
     else:
         disp = main_sum[['ABCランク', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性スコア']]
-        st_disp = disp.style.format({'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性スコア': '{:.2f}'})
+        disp.columns = ['ABCランク', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性スコア']
+        st_disp = style_dataframe(disp.style.format({'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性スコア': '{:.2f}'}))
 
-    # スタイリングの適用（matplotlibエラー回避用）
-    try:
-        if mode == "比較モード":
-            st_disp = st_disp.background_gradient(subset=['MoM/YoY(%)'], cmap='RdYlGn').background_gradient(subset=['季節性スコア'], cmap='Oranges')
-        else:
-            st_disp = st_disp.background_gradient(subset=['売上'], cmap='YlGnBu').background_gradient(subset=['季節性スコア'], cmap='Oranges')
-    except ImportError:
-        pass # matplotlibがない場合は色付けなしで継続
-
-    # ABCランクのスタイル適用（Pandas 2.1.0以降対応）
-    if hasattr(st_disp, 'map'):
-        st_disp = st_disp.map(style_abc, subset=['ABCランク'])
-    else:
-        st_disp = st_disp.applymap(style_abc, subset=['ABCランク'])
-
-    st.dataframe(st_disp, use_container_width=True, height=600)
+    st.dataframe(st_disp, use_container_width=True, height=650)
 
 except Exception as e:
     st.error(f"システムエラー: {e}")
