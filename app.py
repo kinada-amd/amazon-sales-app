@@ -4,42 +4,62 @@ from datetime import datetime
 import io
 import requests
 
-# 1. ページ設定
+# 1. ページ設定（ライトモード固定のための設定）
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
 # --- 【URL設定】 ---
 URL_MASTER = "http://gigaplus.makeshop.jp/aimedia/data/master.xlsx"
 URL_SALES = "http://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"
 
-# 2. 強制ライトモード & AmazonデザインCSS（ダークモードを完全に遮断）
+# 2. デザイン修正（Amazonトーン＆マナー / ダークモード完全排除 / フォントAmazon Ember風）
 st.markdown("""
     <style>
-    /* 背景と文字色を強制固定 */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+    
+    /* 1. 背景と文字色を強制固定（ブラウザのダークモードを無効化） */
     html, body, [data-testid="stAppViewContainer"], .stApp {
         background-color: #FFFFFF !important;
         color: #131921 !important;
+        font-family: 'Inter', -apple-system, sans-serif !important;
     }
-    [data-testid="stHeader"] { background-color: rgba(0,0,0,0) !important; }
-    
-    /* サイドバー */
-    [data-testid="stSidebar"] { background-color: #131921 !important; }
-    [data-testid="stSidebar"] * { color: #FFFFFF !important; }
 
-    /* セレクトボックスの視認性 */
+    /* 2. サイドバー：Amazonネイビー */
+    [data-testid="stSidebar"] {
+        background-color: #131921 !important;
+    }
+    [data-testid="stSidebar"] * {
+        color: #FFFFFF !important;
+    }
+
+    /* 3. 期間選択枠の視認性修正（枠内は白背景・文字は濃紺で固定） */
     div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important;
-        color: #131921 !important;
-    }
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] div {
-        color: #131921 !important;
+        color: #131921 !important; /* ←ここで選択中の文字が見えるようになります */
+        border: 1px solid #D5D9D9 !important;
     }
     
-    /* テキスト・メトリック */
-    h1, h2, h3, p, span, label { color: #131921 !important; }
-    div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; }
-    
-    /* テーブル */
-    .stDataFrame { border: 1px solid #D5D9D9 !important; }
+    /* 選択肢リスト（ドロップダウン）も白背景・黒文字 */
+    ul[role="listbox"] {
+        background-color: #FFFFFF !important;
+    }
+    ul[role="listbox"] li {
+        color: #131921 !important;
+    }
+
+    /* 4. 英字・数字のフォントをAmazonのトンマナ（力強くスタイリッシュ）に */
+    div[data-testid="stMetricValue"], .stDataFrame, h1, h2, h3, p, span {
+        font-family: 'Inter', sans-serif !important;
+        letter-spacing: -0.02em !important;
+    }
+    div[data-testid="stMetricValue"] {
+        color: #131921 !important;
+        font-weight: 800 !important;
+    }
+
+    /* 5. 検索窓のスタイル */
+    input {
+        color: #131921 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -55,116 +75,102 @@ try:
         df_master = pd.read_excel(load_data_from_url(URL_MASTER))
         df_sales = pd.read_excel(load_data_from_url(URL_SALES))
 
-    # データクレンジング（スペース削除・数値変換）
+    # クレンジング
     df_sales.columns = df_sales.columns.str.strip()
     df_master.columns = df_master.columns.str.strip()
     for col in ['売上', '数量']:
         if col in df_sales.columns:
             df_sales[col] = pd.to_numeric(df_sales[col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
 
-    # 日付処理
     df_sales['日付_dt'] = pd.to_datetime(df_sales['日付'], format='%Y年%m月', errors='coerce').fillna(
         pd.to_datetime(df_sales['日付'], errors='coerce')
     )
     df_sales['年月'] = df_sales['日付_dt'].dt.strftime('%Y-%m')
     all_months = sorted(df_sales['年月'].dropna().unique(), reverse=True)
 
-    # --- サイドバー：設定 ---
+    # --- サイドバー設定 ---
     st.sidebar.title("Amazon Analytics")
     st.sidebar.markdown("---")
     
     mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"])
-    st.sidebar.markdown("---")
     
     if mode == "通常モード":
         st.sidebar.subheader("集計期間の設定")
-        start_m = st.sidebar.selectbox("開始月", all_months, index=len(all_months)-1)
-        end_m = st.sidebar.selectbox("終了月", all_months, index=0)
-        is_compare = False
+        start_m = st.sidebar.selectbox("開始月", all_months, index=len(all_months)-1, key="n_s")
+        end_m = st.sidebar.selectbox("終了月", all_months, index=0, key="n_e")
     else:
         st.sidebar.subheader("ベース期間（現在）")
-        start_m = st.sidebar.selectbox("開始月", all_months, index=0)
-        end_m = st.sidebar.selectbox("終了月", all_months, index=0)
+        start_m = st.sidebar.selectbox("開始月", all_months, index=0, key="c_s")
+        end_m = st.sidebar.selectbox("終了月", all_months, index=0, key="c_e")
+        st.sidebar.markdown("---")
         st.sidebar.subheader("比較対象期間（過去）")
-        comp_start_m = st.sidebar.selectbox("比較開始", all_months, index=min(1, len(all_months)-1))
-        comp_end_m = st.sidebar.selectbox("比較終了", all_months, index=min(1, len(all_months)-1))
-        is_compare = True
+        comp_start_m = st.sidebar.selectbox("比較開始", all_months, index=min(1, len(all_months)-1), key="cc_s")
+        comp_end_m = st.sidebar.selectbox("比較終了", all_months, index=min(1, len(all_months)-1), key="cc_e")
 
-    # --- 集計ロジック ---
-    # マスターと販売データをASINで結合
+    # --- データ集計ロジック ---
     df_full = pd.merge(df_sales, df_master, on='ASIN', how='left').fillna({'コード':'N/A', '正式品名':'不明', '規格':'-'})
     
-    def get_summary(df, s, e):
-        # 指定期間のデータを抽出して集計
+    def get_sum(df, s, e):
         mask = (df['年月'] >= s) & (df['年月'] <= e)
         return df[mask].groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
 
-    # メイン期間の集計実行
-    main_summary = get_summary(df_full, start_m, end_m)
+    main_res = get_sum(df_full, start_m, end_m)
 
-    # --- 表示エリア ---
+    # --- メイン表示 ---
     st.title("Sales Performance Dashboard")
     
-    # 上部メトリクス
     m1, m2, m3 = st.columns(3)
-    total_sales = main_summary['売上'].sum()
-    
-    if is_compare:
-        comp_summary = get_summary(df_full, comp_start_m, comp_end_m)
-        total_sales_comp = comp_summary['売上'].sum()
-        growth = ((total_sales / total_sales_comp) - 1) * 100 if total_sales_comp > 0 else 0
+    total_sales = main_res['売上'].sum()
+
+    if mode == "比較モード":
+        comp_res = get_sum(df_full, comp_start_m, comp_end_m)
+        total_comp = comp_res['売上'].sum()
+        growth = ((total_sales / total_comp) - 1) * 100 if total_comp > 0 else 0
         
         m1.metric("Selected Sales", f"¥{int(total_sales):,}", f"{growth:+.1f}%")
-        m2.metric("Comparison Sales", f"¥{int(total_sales_comp):,}")
+        m2.metric("Comparison Sales", f"¥{int(total_comp):,}")
     else:
         m1.metric("Total Sales", f"¥{int(total_sales):,}")
-        m2.metric("Total Units", f"{int(main_summary['数量'].sum()):,}")
+        m2.metric("Total Units", f"{int(main_res['数量'].sum()):,}")
     
-    m3.metric("Product Count", f"{len(main_summary):,}")
+    m3.metric("Product Count", f"{len(main_res):,}")
 
     st.markdown("---")
-
-    # --- 売上詳細テーブル ---
     st.subheader("売上詳細")
-    
-    if is_compare:
-        # 比較モード用の表作成
+
+    # テーブル用データ作成
+    if mode == "比較モード":
+        # ASINを軸に「現在」と「比較」を横に並べる
         display_df = pd.merge(
-            main_summary, 
-            comp_summary[['ASIN', '売上', '数量']], 
+            main_res, 
+            comp_res[['ASIN', '売上', '数量']], 
             on='ASIN', 
             how='left', 
-            suffixes=('', '_過去')
+            suffixes=('', '_Comp')
         ).fillna(0)
         
-        # 増減率計算
-        display_df['増減率(%)'] = ((display_df['売上'] / display_df['売上_過去']) - 1) * 100
-        display_df.loc[display_df['売上_過去'] == 0, '増減率(%)'] = 0
+        display_df['YoY/MoM (%)'] = ((display_df['売上'] / display_df['売上_Comp']) - 1) * 100
+        display_df.loc[display_df['売上_Comp'] == 0, 'YoY/MoM (%)'] = 0
         
-        # 列整理
-        display_df = display_df[['ASIN', 'コード', '正式品名', '売上', '売上_過去', '増減率(%)', '数量']]
-        display_df.columns = ['ASIN', 'コード', '商品名', '売上(現在)', '売上(比較)', '増減率(%)', '数量']
-        format_dict = {'売上(現在)': '¥{:,.0f}', '売上(比較)': '¥{:,.0f}', '増減率(%)': '{:+.1f}%', '数量': '{:,.0f}'}
+        display_df = display_df[['ASIN', 'コード', '正式品名', '売上', '売上_Comp', 'YoY/MoM (%)', '数量']]
+        display_df.columns = ['ASIN', 'Code', 'Product Name', 'Sales (Now)', 'Sales (Comp)', 'Growth (%)', 'Qty']
+        fmt = {'Sales (Now)': '¥{:,.0f}', 'Sales (Comp)': '¥{:,.0f}', 'Growth (%)': '{:+.1f}%', 'Qty': '{:,.0f}'}
     else:
-        # 通常モード用の表作成
-        display_df = main_summary[['ASIN', 'コード', '正式品名', '売上', '数量']]
-        display_df.columns = ['ASIN', 'コード', '商品名', '売上', '数量']
-        format_dict = {'売上': '¥{:,.0f}', '数量': '{:,.0f}'}
+        display_df = main_res[['ASIN', 'コード', '正式品名', '売上', '数量']]
+        display_df.columns = ['ASIN', 'Code', 'Product Name', 'Sales', 'Qty']
+        fmt = {'Sales': '¥{:,.0f}', 'Qty': '{:,.0f}'}
 
-    # 検索窓
-    search = st.text_input("検索 (商品名, コード, ASIN)", "").lower()
+    # 検索機能
+    search = st.text_input("Search (Product Name, Code, or ASIN)", "").lower()
     if search:
         display_df = display_df[
-            display_df['商品名'].str.lower().str.contains(search, na=False) | 
-            display_df['コード'].astype(str).str.contains(search, na=False) | 
+            display_df['Product Name'].str.lower().str.contains(search, na=False) | 
+            display_df['Code'].astype(str).str.contains(search, na=False) | 
             display_df['ASIN'].str.lower().str.contains(search, na=False)
         ]
 
-    # テーブル表示（ここで確実に数字を反映）
-    if not display_df.empty:
-        st.dataframe(display_df.style.format(format_dict), use_container_width=True, height=600)
-    else:
-        st.warning("選択された期間にデータが存在しません。サイドバーの期間を確認してください。")
+    # テーブル表示（確実に反映）
+    st.dataframe(display_df.style.format(fmt), use_container_width=True, height=700)
 
 except Exception as e:
-    st.error(f"システムエラー: {e}")
+    st.error(f"Error: {e}")
