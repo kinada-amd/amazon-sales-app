@@ -65,8 +65,18 @@ try:
         if c in df_s.columns:
             df_s[c] = pd.to_numeric(df_s[c].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
 
-    df_s['年月'] = pd.to_datetime(df_s['日付'], format='%Y年%m月', errors='coerce').dt.strftime('%Y-%m')
-    all_m = sorted(df_s['年月'].dropna().unique(), reverse=True)
+    # 日付データの処理
+    df_s['日付_dt'] = pd.to_datetime(df_s['日付'], format='%Y年%m月', errors='coerce')
+    df_s['年月'] = df_s['日付_dt'].dt.strftime('%Y-%m')
+    
+    # 年度計算 (4月開始)
+    # 1-3月なら年を-1することで「25年3月」を「24年度」として扱う
+    df_s['年度'] = df_s['日付_dt'].apply(lambda x: f"{str(x.year - 1)[2:]}年度" if x.month <= 3 else f"{str(x.year)[2:]}年度")
+
+    # 選択肢の作成（月リスト + 年度リスト）
+    all_months = sorted(df_s['年月'].dropna().unique(), reverse=True)
+    all_years = sorted(df_s['年度'].dropna().unique(), reverse=True)
+    all_options = all_years + all_months
 
     # --- サイドバー ---
     st.sidebar.title("Amazon Analytics")
@@ -74,14 +84,23 @@ try:
     st.sidebar.markdown("---")
 
     if mode == "通常モード":
-        target_m = st.sidebar.selectbox("表示する月を選択", all_m, index=0, key="m1")
+        target_m = st.sidebar.selectbox("表示する期間を選択", all_options, index=0, key="m1")
         comp_m = None
     else:
-        target_m = st.sidebar.selectbox("現在の月（現在）", all_m, index=0, key="m2")
-        comp_m = st.sidebar.selectbox("比較する月（比較）", all_m, index=min(1, len(all_m)-1), key="m3")
+        target_m = st.sidebar.selectbox("現在の期間（現在）", all_options, index=0, key="m2")
+        comp_m = st.sidebar.selectbox("比較する期間（比較）", all_options, index=min(1, len(all_options)-1), key="m3")
 
     df_f = pd.merge(df_s, df_m, on='ASIN', how='left').fillna({'コード':'N/A', '正式品名':'不明', '規格':'-'})
-    main_res = df_f[df_f['年月'] == target_m].groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
+
+    # 集計用関数 (月または年度でフィルタリング)
+    def filter_data(df, period):
+        if "年度" in period:
+            return df[df['年度'] == period]
+        else:
+            return df[df['年月'] == period]
+
+    main_res_raw = filter_data(df_f, target_m)
+    main_res = main_res_raw.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
 
     # --- 表示エリア ---
     st.title("Sales Performance Dashboard")
@@ -89,7 +108,9 @@ try:
     val_now = main_res['売上'].sum()
 
     if mode == "比較モード":
-        prev_res = df_f[df_f['年月'] == comp_m].groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
+        prev_res_raw = filter_data(df_f, comp_m)
+        prev_res = prev_res_raw.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
+        
         val_prev = prev_res['売上'].sum()
         pct = ((val_now / val_prev) - 1) * 100 if val_prev > 0 else 0
         m1.metric(f"売上 ({target_m})", f"¥{int(val_now):,}", f"{pct:+.1f}%")
@@ -105,7 +126,6 @@ try:
         disp['MoM/YoY (%)_右'] = disp['MoM/YoY (%)']
         
         col_now, col_prev = f"売上({target_m})", f"売上({comp_m})"
-        # 列の順番を再構成（数量の右に伸長率を追加）
         disp = disp[['ASIN', 'コード', '正式品名', '規格', '売上', '売上_比較', 'MoM/YoY (%)', '数量', 'MoM/YoY (%)_右']]
         disp.columns = ['ASIN', 'コード', '正式品名', '規格', col_now, col_prev, 'MoM/YoY (%)', '数量', 'MoM/YoY (%) ']
         
