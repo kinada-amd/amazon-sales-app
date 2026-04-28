@@ -25,6 +25,7 @@ st.markdown("""
     div[data-baseweb="select"] > div { background-color: #FFFFFF !important; border: 1px solid #D5D9D9 !important; }
     div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important; }
     h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; }
+    .st-emotion-cache-zy6yx3 {padding: 3rem 1rem 10rem;}
     </style>
     """, unsafe_allow_html=True)
 
