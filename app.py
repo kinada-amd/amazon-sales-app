@@ -7,12 +7,12 @@ import plotly.graph_objects as go
 # 1. ページ設定
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正（Amazonトーン＆マナー：検索窓の視認性とライトモードを完全固定）
+# 2. デザイン修正（Amazonトーン＆マナー / 検索窓視認性固定）
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
     
-    /* 検索窓・入力エリアの文字色を黒に強制 */
+    /* 検索窓の文字色を強制的に黒に */
     input { color: #131921 !important; }
     
     html, body, [data-testid="stAppViewContainer"], .stApp {
@@ -153,13 +153,25 @@ try:
     st.info("ABCランク：売上貢献度(A=上位70%) / 季節性スコア：年間平均との倍率")
 
     if mode == "比較モード" and comp_p:
-        disp = pd.merge(sum_now, sum_prev[['ASIN', '売上']], on='ASIN', how='left', suffixes=('', '_c')).fillna(0)
-        disp['MoM/YoY(%)'] = ((disp['売上'] / disp['売上_c']) - 1) * 100
-        disp.loc[disp['売上_c'] == 0, 'MoM/YoY(%)'] = 0
-        c1, c2 = f"売上({target_p})", f"売上({comp_p})"
-        disp = disp[['ABC', 'ASIN', '正式品名', '規格', '売上', '売上_c', 'MoM/YoY(%)', '季節性']].copy()
-        disp.columns = ['ABCランク', 'ASIN', '正式品名', '規格', c1, c2, 'MoM/YoY(%)', '季節性スコア']
-        fmt = {c1: '¥{:,.0f}', c2: '¥{:,.0f}', 'MoM/YoY(%)': '{:+.1f}%', '季節性スコア': '{:.2f}'}
+        # 売上と比較対象をマージ
+        disp = pd.merge(sum_now, sum_prev[['ASIN', '売上', '数量']], on='ASIN', how='left', suffixes=('', '_c')).fillna(0)
+        
+        # 売上のMoM/YoY
+        disp['売上MoM(%)'] = ((disp['売上'] / disp['売上_c']) - 1) * 100
+        disp.loc[disp['売上_c'] == 0, '売上MoM(%)'] = 0
+        
+        # 数量のMoM/YoY
+        disp['数量MoM(%)'] = ((disp['数量'] / disp['数量_c']) - 1) * 100
+        disp.loc[disp['数量_c'] == 0, '数量MoM(%)'] = 0
+
+        c_s_n, c_s_p = f"売上({target_p})", f"売上({comp_p})"
+        c_q_n, c_q_p = f"数量({target_p})", f"数量({comp_p})"
+        
+        # 列の並び替え
+        disp = disp[['ABC', 'ASIN', '正式品名', '規格', '売上', '売上_c', '売上MoM(%)', '数量', '数量_c', '数量MoM(%)', '季節性']].copy()
+        disp.columns = ['ABCランク', 'ASIN', '正式品名', '規格', c_s_n, c_s_p, '売上MoM(%)', c_q_n, c_q_p, '数量MoM(%)', '季節性スコア']
+        fmt = {c_s_n: '¥{:,.0f}', c_s_p: '¥{:,.0f}', '売上MoM(%)': '{:+.1f}%', 
+               c_q_n: '{:,.0f}', c_q_p: '{:,.0f}', '数量MoM(%)': '{:+.1f}%', '季節性スコア': '{:.2f}'}
     else:
         disp = sum_now[['ABC', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性']].copy()
         disp.columns = ['ABCランク', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性スコア']
@@ -171,7 +183,12 @@ try:
 
     # 重複エラー回避のため一度インデックスを整理
     disp = disp.reset_index(drop=True)
-    st.dataframe(disp.style.format(fmt).map(style_table, subset=['ABCランク']), use_container_width=True, height=600)
+    st.dataframe(
+        disp.style.format(fmt).map(style_table, subset=['ABCランク']), 
+        use_container_width=True, 
+        height=600,
+        hide_index=True  # 左側の行番号を削除
+    )
 
 except Exception as e:
     st.error(f"システムエラー: {e}")
