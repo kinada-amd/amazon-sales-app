@@ -5,29 +5,20 @@ import requests
 import plotly.graph_objects as go
 
 # 1. ページ設定
-st.set_page_config(page_title="Amazon Analytics", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正（右下の全要素を徹底的に排除）
+# 2. デザイン修正（外部リンク・メニュー類を完全に非表示にする設定を追加）
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
     
-    /* 全体メニュー・ヘッダー・フッターの非表示 */
-    #MainMenu {visibility: hidden !important;}
-    header {visibility: hidden !important;}
-    footer {visibility: hidden !important;}
+    /* 外部リンク・メニュー類の非表示設定 */
+    #MainMenu {visibility: hidden;} /* 右上の三本線メニュー */
+    header {visibility: hidden;}   /* GitHubリンクなどを含むヘッダー全体 */
+    footer {visibility: hidden;}   /* Hosted with Streamlitを含むフッター全体 */
+    .stAppDeployButton {display:none;} /* デプロイボタン（もしあれば） */
     
-    /* 右下デプロイボタン・接続ステータス・ツールバーの完全排除 */
-    .stDeployButton {display:none !important;}
-    .stAppDeployButton {display:none !important;}
-    [data-testid="stStatusWidget"] {display:none !important;}
-    [data-testid="stActionButtonIcon"] {display:none !important;}
-    [data-testid="stToolbar"] {display:none !important;}
-    
-    /* 画面下部の余計な装飾を消す */
-    div[data-testid="stDecoration"] {display:none !important;}
-
-    /* 入力エリア・セレクトボックスの文字色固定 */
+    /* 入力エリア・セレクトボックスの文字色 */
     input { color: #131921 !important; }
     div[data-baseweb="select"] * { color: #131921 !important; }
     
@@ -48,9 +39,7 @@ st.markdown("""
     div[data-baseweb="select"] > div { background-color: #FFFFFF !important; border: 1px solid #D5D9D9 !important; }
     div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important; }
     h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; }
-    
-    /* 上部の不要な余白をカット */
-    .st-emotion-cache-zy6yx3 {padding-top: 1rem;}
+    .st-emotion-cache-zy6yx3 {padding-top: 1rem;} /* ヘッダーを消した分、上の余白を調整 */
     </style>
     """, unsafe_allow_html=True)
 
