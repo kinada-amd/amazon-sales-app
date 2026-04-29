@@ -5,7 +5,7 @@ import requests
 import plotly.graph_objects as go
 
 # 1. ページ設定
-st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Amazon Sales Analytics", layout="wide", initial_sidebar_state="expanded")
 
 # 2. デザイン修正（バグ徹底排除・フォント同期・アイコン刷新）
 st.markdown("""
@@ -91,7 +91,7 @@ try:
     all_y = sorted(df_s['年度'].dropna().unique(), reverse=True)
 
     # --- サイドバー (アイコン追加 + 広告アプリへのリンク) ---
-    st.sidebar.markdown('<h2><i class="fa-solid fa-chart-line"></i> Amazon Analytics</h2>', unsafe_allow_html=True)
+    st.sidebar.markdown('<h2><i class="fa-solid fa-chart-line"></i> Amazon Sales Analytics</h2>', unsafe_allow_html=True)
     
     st.sidebar.link_button("広告実績へ切り替える", "https://amazon-ads-app.streamlit.app/")
     st.sidebar.markdown("---")
