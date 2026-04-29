@@ -4,17 +4,21 @@ import io
 import requests
 import plotly.graph_objects as go
 
-# 1. ページ設定（認証画面より先に実行する必要があります）
-st.set_page_config(page_title="Amazon Sales Analytics", layout="wide", initial_sidebar_state="expanded")
+# ==========================================
+# 1. ページ設定（認証画面より先に実行が必要）
+# ==========================================
+st.set_page_config(page_title="Amazon Analytics", layout="wide", initial_sidebar_state="expanded")
 
-# --- パスワード認証関数 ---
+# ==========================================
+# 2. パスワード認証関数
+# ==========================================
 def check_password():
     """パスワードが正しいか確認し、正しければTrueを返す"""
     def password_entered():
         """入力されたパスワードをチェックする"""
         if st.session_state["password"] == st.secrets["password"]:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # セッションからパスワードを消して安全にする
+            del st.session_state["password"]  # セッションからパスワードを消去
         else:
             st.session_state["password_correct"] = False
 
@@ -23,13 +27,7 @@ def check_password():
         return True
 
     # ログイン画面の表示
-    st.markdown("""
-        <style>
-        .auth-container { max-width: 400px; margin: 100px auto; padding: 30px; border-radius: 10px; border: 1px solid #ddd; }
-        </style>
-    """, unsafe_allow_allow_html=True)
-    
-    st.title("Amazon App Login")
+    st.title("🔒 Amazon App Login")
     st.text_input(
         "パスワードを入力してください", 
         type="password", 
@@ -38,13 +36,15 @@ def check_password():
     )
 
     if "password_correct" in st.session_state:
-        st.error("パスワードが正しくありません")
+        st.error("😕 パスワードが正しくありません")
     
     return False
 
-# --- 認証チェック開始 ---
+# ==========================================
+# 3. メインアプリ（認証成功時のみ実行）
+# ==========================================
 if check_password():
-    # 2. デザイン修正（認証後に適用）
+    # --- デザイン修正（CSS） ---
     st.markdown("""
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -112,6 +112,7 @@ if check_password():
             st.metric("季節性スコア", f"{summary_row['季節性']:.2f}")
 
     try:
+        # データ読み込み
         df_m = pd.read_excel(load_data("https://gigaplus.makeshop.jp/aimedia/data/master.xlsx"))
         df_s = pd.read_excel(load_data("https://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"))
 
@@ -200,7 +201,6 @@ if check_password():
 
         st.markdown("---")
         st.subheader("売上詳細分析")
-        st.info("ABCランク：売上貢献度(A=上位70%) / 季節性スコア：年間平均売上に対する当月の売上倍率")
         
         def style_table(v):
             if v == 'A': return 'color: #FF9900; font-weight: 800;'
@@ -251,4 +251,4 @@ if check_password():
             st.warning("⚠️ **表示期間の設定を確認してください**")
 
     except Exception as e:
-        st.error(f"システムエラーが発生しました。設定を確認してください。")
+        st.error(f"システムエラーが発生しました。")
