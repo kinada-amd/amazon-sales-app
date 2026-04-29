@@ -67,8 +67,8 @@ def show_product_detail(asin, full_data, summary_row):
         st.metric("季節性スコア", f"{summary_row['季節性']:.2f}")
 
 try:
-    df_m = pd.read_excel(load_data("http://gigaplus.makeshop.jp/aimedia/data/master.xlsx"))
-    df_s = pd.read_excel(load_data("http://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"))
+    df_m = pd.read_excel(load_data("https://gigaplus.makeshop.jp/aimedia/data/master.xlsx"))
+    df_s = pd.read_excel(load_data("https://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"))
 
     df_s.columns = df_s.columns.str.strip()
     df_m.columns = df_m.columns.str.strip()
