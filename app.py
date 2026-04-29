@@ -34,6 +34,8 @@ div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !
 h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; font-family: 'Inter', sans-serif !important; }
 .st-emotion-cache-zy6yx3 {padding-top: 1rem !important;padding-bottom: 3rem !important;}
 .st-emotion-cache-qmp9ai {visibility: visible;}
+.st-emotion-cache-1r1cntt {padding-top: 1rem;}
+.st-emotion-cache-10p9htt {display: none;}
 </style>
 """, unsafe_allow_html=True)
 
