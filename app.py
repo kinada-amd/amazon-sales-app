@@ -89,10 +89,9 @@ try:
     all_m = sorted(df_s['年月'].dropna().unique(), reverse=True)
     all_y = sorted(df_s['年度'].dropna().unique(), reverse=True)
 
-    # --- サイドバー (アイコン追加 + 広告アプリへのリンク) ---
+    # --- サイドバー ---
     st.sidebar.markdown('<h2><i class="fa-solid fa-chart-line"></i> Amazon Analytics</h2>', unsafe_allow_html=True)
-    
-    st.sidebar.link_button("広告実績分析へ移動", "https://amazon-ads-app.streamlit.app/")
+    st.sidebar.link_button("📢 広告実績分析へ移動", "https://amazon-ads-app.streamlit.app/")
     st.sidebar.markdown("---")
 
     mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"], key="mode")
@@ -130,7 +129,8 @@ try:
     sum_now = raw_now.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
     sum_now = get_ana(df_f, sum_now)
 
-    st.title(f"Sales : {target_p}")
+    # タイトルを Sales Summary に変更
+    st.title(f"Sales Summary : {target_p}")
     
     m1, m2, m3 = st.columns(3)
     v_now = sum_now['売上'].sum()
@@ -161,7 +161,6 @@ try:
 
     st.markdown("---")
     st.subheader("売上詳細分析")
-    st.info("ABCランク：売上貢献度(A=上位70%) / 季節性スコア：年間平均売上に対する当月の売上倍率")
     
     def style_table(v):
         if v == 'A': return 'color: #FF9900; font-weight: 800;'
