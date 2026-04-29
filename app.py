@@ -31,13 +31,6 @@ st.markdown("""
     ._profileContainer_gzau3_53 {display: none!important;}
     ._link_gzau3_10 {display: none!important;}
     ._viewerBadge_nim44_23 {display: none!important;}
-
-/* 右下デプロイボタン・接続ステータス・ツールバーの完全排除 */
-    .stDeployButton {display:none !important;}
-    .stAppDeployButton {display:none !important;}
-    [data-testid="stStatusWidget"] {display:none !important;}
-    [data-testid="stActionButtonIcon"] {display:none !important;}
-    [data-testid="stToolbar"] {display:none !important;}
     </style>
     """, unsafe_allow_html=True)
 
