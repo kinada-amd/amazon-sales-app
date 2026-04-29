@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 # 1. ページ設定
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正
+# 2. デザイン修正（白背景・Interフォント強制・メニュー非表示）
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
@@ -62,7 +62,7 @@ def show_product_detail(asin, full_data, summary_row):
             x=prod_trend['日付_dt'], 
             y=prod_trend['売上'], 
             customdata=prod_trend['数量'],
-            mode='lines+markers', 
+            mode='markers+lines', 
             line=dict(color='#FF9900', width=3),
             marker=dict(size=8),
             hovertemplate='<b>%{x|%Y年%m月}</b><br>売上: ¥%{y:,.0f}<br>数量: %{customdata:,.0f} 個<extra></extra>', 
@@ -133,6 +133,7 @@ try:
     sum_now = raw_now.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
     sum_now = get_ana(df_f, sum_now)
 
+    # メインタイトル修正
     st.title(f"Sales Summary : {target_p}")
     
     m1, m2, m3 = st.columns(3)
@@ -182,4 +183,37 @@ try:
         c_q_n, c_q_p = f"数量({target_p})", f"数量({comp_p})"
         
         disp = disp[['ABC', 'ASIN', 'コード', '正式品名', '規格', '売上', '売上_c', '売上MoM(%)', '数量', '数量_c', '数量MoM(%)', '季節性']].copy()
-        disp.columns = ['ABC', 'ASIN', 'コード', '正式品名', '規格', c1, c2, '売上MoM(%)', c_q_n, c_q_p, '数量MoM(%)', '季節性
+        disp.columns = ['ABC', 'ASIN', 'コード', '正式品名', '規格', c1, c2, '売上MoM(%)', c_q_n, c_q_p, '数量MoM(%)', '季節性']
+        fmt = {c1: '¥{:,.0f}', c2: '¥{:,.0f}', '売上MoM(%)': '{:+.1f}%', c_q_n: '{:,.0f}', c_q_p: '{:,.0f}', '数量MoM(%)': '{:+.1f}%', '季節性': '{:.2f}'}
+    else:
+        disp = sum_now[['ABC', 'ASIN', 'コード', '正式品名', '規格', '売上', '数量', '季節性']].copy()
+        fmt = {'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性': '{:.2f}'}
+
+    search = st.text_input("検索窓 (正式品名, ASIN, コード)", "").lower()
+    if search:
+        disp = disp[
+            disp['正式品名'].str.lower().str.contains(search, na=False) | 
+            disp['ASIN'].str.lower().str.contains(search, na=False) |
+            disp['コード'].str.lower().str.contains(search, na=False)
+        ]
+
+    try:
+        disp = disp.reset_index(drop=True)
+        event = st.dataframe(
+            disp.style.format(fmt).map(style_table, subset=['ABC']), 
+            use_container_width=True, 
+            height=600,
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row"
+        )
+        if event.selection.rows:
+            selected_row_idx = event.selection.rows[0]
+            selected_row_data = disp.iloc[selected_row_idx]
+            show_product_detail(selected_row_data['ASIN'], df_f, selected_row_data)
+
+    except Exception:
+        st.warning("⚠️ **表示期間の設定を確認してください**")
+
+except Exception as e:
+    st.error(f"システムエラーが発生しました。設定を確認してください。")
