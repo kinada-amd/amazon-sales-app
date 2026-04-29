@@ -32,11 +32,12 @@ st.markdown("""
     ._link_gzau3_10 {display: none!important;}
     ._viewerBadge_nim44_23 {display: none!important;}
 
-    /* 2. 右下の赤いバッジ（Deployボタン）を非表示 */
+/* 右下デプロイボタン・接続ステータス・ツールバーの完全排除 */
+    .stDeployButton {display:none !important;}
     .stAppDeployButton {display:none !important;}
-    
-    /* 3. 右下の緑のアイコン（Connection Status）を非表示 */
     [data-testid="stStatusWidget"] {display:none !important;}
+    [data-testid="stActionButtonIcon"] {display:none !important;}
+    [data-testid="stToolbar"] {display:none !important;}
     </style>
     """, unsafe_allow_html=True)
 
