@@ -92,7 +92,7 @@ try:
     # --- サイドバー (アイコン追加 + 広告アプリへのリンク) ---
     st.sidebar.markdown('<h2><i class="fa-solid fa-chart-line"></i> Amazon Analytics</h2>', unsafe_allow_html=True)
     
-    st.sidebar.link_button("📢 広告実績分析へ移動", "https://amazon-ads-app.streamlit.app/")
+    st.sidebar.link_button("広告実績分析へ移動", "https://amazon-ads-app.streamlit.app/")
     st.sidebar.markdown("---")
 
     mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"], key="mode")
@@ -130,7 +130,7 @@ try:
     sum_now = raw_now.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
     sum_now = get_ana(df_f, sum_now)
 
-    st.title(f"Sales : {target_p}")
+    st.title(f"Sales Summary : {target_p}")
     
     m1, m2, m3 = st.columns(3)
     v_now = sum_now['売上'].sum()
