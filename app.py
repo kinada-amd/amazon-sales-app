@@ -92,16 +92,14 @@ try:
     all_m = sorted(df_s['年月'].dropna().unique(), reverse=True)
     all_y = sorted(df_s['年度'].dropna().unique(), reverse=True)
 
-    # --- サイドバー ---
+    # --- サイドバー (アイコン追加 + 広告アプリへのリンク) ---
     st.sidebar.markdown('<h2>Amazon Sales Analytics</h2>', unsafe_allow_html=True)
     
     st.sidebar.link_button("広告実績へ切り替える", "https://amazon-ads-app.streamlit.app/")
     st.sidebar.markdown("---")
 
     mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"], key="mode")
-    
-    # 【修正箇所】horizontal=Trueを削除して縦並びに変更
-    unit = st.sidebar.radio("表示単位を選択", ["月単位", "年度単位"])
+    unit = st.sidebar.radio("表示単位を選択", ["月単位", "年度単位"], horizontal=True)
 
     if mode == "通常モード":
         opts = all_m if unit == "月単位" else all_y
@@ -111,10 +109,7 @@ try:
         opts = all_m if unit == "月単位" else all_y
         target_p = st.sidebar.selectbox("現在の期間（現在）", opts, index=0, key="m2")
         st.sidebar.markdown("---")
-        
-        # 【修正箇所】ここもhorizontal=Trueを削除して縦並びに統一
-        c_unit = st.sidebar.radio("比較先の単位を選択", ["月単位", "年度単位"], key="cu")
-        
+        c_unit = st.sidebar.radio("比較先の単位を選択", ["月単位", "年度単位"], horizontal=True, key="cu")
         c_opts = all_m if c_unit == "月単位" else all_y
         comp_p = st.sidebar.selectbox("比較する期間（比較）", c_opts, index=min(1, len(c_opts)-1), key="m3")
 
