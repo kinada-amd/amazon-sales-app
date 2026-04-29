@@ -7,39 +7,25 @@ import plotly.graph_objects as go
 # 1. ページ設定
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正（外部リンク・メニュー類を完全に非表示にする設定を追加）
+# 2. デザイン修正
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
-    
-    /* 外部リンク・メニュー類の非表示設定 */
-    #MainMenu {visibility: hidden;} /* 右上の三本線メニュー */
-    header {visibility: hidden;}   /* GitHubリンクなどを含むヘッダー全体 */
-    footer {visibility: hidden;}   /* Hosted with Streamlitを含むフッター全体 */
-    .stAppDeployButton {display:none;} /* デプロイボタン（もしあれば） */
-    
-    /* 入力エリア・セレクトボックスの文字色 */
     input { color: #131921 !important; }
     div[data-baseweb="select"] * { color: #131921 !important; }
-    
     html, body, [data-testid="stAppViewContainer"], .stApp {
         background-color: #FFFFFF !important;
         color: #131921 !important;
         font-family: 'Inter', sans-serif !important;
     }
-
-    [data-testid="stHeader"] { 
-        background-color: rgba(255, 255, 255, 0) !important; 
-        color: #131921 !important;
-    }
-
+    #MainMenu, footer { visibility: hidden !important; }
     [data-testid="stSidebar"] { background-color: #131921 !important; }
     [data-testid="stSidebar"] * { color: #FFFFFF !important; }
     [data-testid="stSidebar"] div[data-baseweb="radio"] * { color: #FFFFFF !important; }
     div[data-baseweb="select"] > div { background-color: #FFFFFF !important; border: 1px solid #D5D9D9 !important; }
     div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important; }
     h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; }
-    .st-emotion-cache-zy6yx3 {padding-top: 1rem;} /* ヘッダーを消した分、上の余白を調整 */
+    .st-emotion-cache-zy6yx3 {padding-top: 3rem;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -178,15 +164,18 @@ try:
         c1, c2 = f"売上({target_p})", f"売上({comp_p})"
         c_q_n, c_q_p = f"数量({target_p})", f"数量({comp_p})"
         
+        # --- ここに 'コード' を追加 ---
         disp = disp[['ABC', 'ASIN', 'コード', '正式品名', '規格', '売上', '売上_c', '売上MoM(%)', '数量', '数量_c', '数量MoM(%)', '季節性']].copy()
         disp.columns = ['ABC', 'ASIN', 'コード', '正式品名', '規格', c1, c2, '売上MoM(%)', c_q_n, c_q_p, '数量MoM(%)', '季節性']
         fmt = {c1: '¥{:,.0f}', c2: '¥{:,.0f}', '売上MoM(%)': '{:+.1f}%', c_q_n: '{:,.0f}', c_q_p: '{:,.0f}', '数量MoM(%)': '{:+.1f}%', '季節性': '{:.2f}'}
     else:
+        # --- ここに 'コード' を追加 ---
         disp = sum_now[['ABC', 'ASIN', 'コード', '正式品名', '規格', '売上', '数量', '季節性']].copy()
         fmt = {'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性': '{:.2f}'}
 
     search = st.text_input("検索窓 (正式品名, ASIN, コード)", "").lower()
     if search:
+        # 検索条件に 'コード' を追加
         disp = disp[
             disp['正式品名'].str.lower().str.contains(search, na=False) | 
             disp['ASIN'].str.lower().str.contains(search, na=False) |
