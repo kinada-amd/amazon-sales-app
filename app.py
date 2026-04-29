@@ -37,7 +37,7 @@ def load_data(url):
 @st.dialog("商品詳細分析", width="large")
 def show_product_detail(asin, full_data, summary_row):
     st.subheader(f"{summary_row['正式品名']}")
-    st.caption(f"ASIN: {asin} | 規格: {summary_row['規格']}")
+    st.caption(f"コード: {summary_row['コード']} | ASIN: {asin} | 規格: {summary_row['規格']}")
     col_d1, col_d2 = st.columns([2, 1])
     prod_trend = full_data[full_data['ASIN'] == asin].sort_values('日付_dt').tail(12)
     with col_d1:
@@ -164,18 +164,23 @@ try:
         c1, c2 = f"売上({target_p})", f"売上({comp_p})"
         c_q_n, c_q_p = f"数量({target_p})", f"数量({comp_p})"
         
-        disp = disp[['ABC', 'ASIN', '正式品名', '規格', '売上', '売上_c', '売上MoM(%)', '数量', '数量_c', '数量MoM(%)', '季節性']].copy()
-        disp.columns = ['ABC', 'ASIN', '正式品名', '規格', c1, c2, '売上MoM(%)', c_q_n, c_q_p, '数量MoM(%)', '季節性']
-        # フォーマット指定で数量(比較)も整数カンマ区切りに修正
-        fmt = {c1: '¥{:,.0f}', c2: '¥{:,.0f}', '売上MoM(%)': '{:+.1f}%', 
-               c_q_n: '{:,.0f}', c_q_p: '{:,.0f}', '数量MoM(%)': '{:+.1f}%', '季節性': '{:.2f}'}
+        # --- ここに 'コード' を追加 ---
+        disp = disp[['ABC', 'ASIN', 'コード', '正式品名', '規格', '売上', '売上_c', '売上MoM(%)', '数量', '数量_c', '数量MoM(%)', '季節性']].copy()
+        disp.columns = ['ABC', 'ASIN', 'コード', '正式品名', '規格', c1, c2, '売上MoM(%)', c_q_n, c_q_p, '数量MoM(%)', '季節性']
+        fmt = {c1: '¥{:,.0f}', c2: '¥{:,.0f}', '売上MoM(%)': '{:+.1f}%', c_q_n: '{:,.0f}', c_q_p: '{:,.0f}', '数量MoM(%)': '{:+.1f}%', '季節性': '{:.2f}'}
     else:
-        disp = sum_now[['ABC', 'ASIN', '正式品名', '規格', '売上', '数量', '季節性']].copy()
+        # --- ここに 'コード' を追加 ---
+        disp = sum_now[['ABC', 'ASIN', 'コード', '正式品名', '規格', '売上', '数量', '季節性']].copy()
         fmt = {'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性': '{:.2f}'}
 
-    search = st.text_input("検索窓 (正式品名, ASIN)", "").lower()
+    search = st.text_input("検索窓 (正式品名, ASIN, コード)", "").lower()
     if search:
-        disp = disp[disp['正式品名'].str.lower().str.contains(search, na=False) | disp['ASIN'].str.lower().str.contains(search, na=False)]
+        # 検索条件に 'コード' を追加
+        disp = disp[
+            disp['正式品名'].str.lower().str.contains(search, na=False) | 
+            disp['ASIN'].str.lower().str.contains(search, na=False) |
+            disp['コード'].str.lower().str.contains(search, na=False)
+        ]
 
     try:
         disp = disp.reset_index(drop=True)
