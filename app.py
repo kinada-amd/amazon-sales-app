@@ -32,7 +32,8 @@ div[data-baseweb="select"] * { color: #131921 !important; }
 }
 div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; font-family: 'Inter', sans-serif !important; }
 h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; font-family: 'Inter', sans-serif !important; }
-.st-emotion-cache-zy6yx3 {padding-top: 1rem !important;}
+.st-emotion-cache-zy6yx3 {padding-top: 1rem !important;padding-bottom: 3rem !important;}
+.st-emotion-cache-qmp9ai {visibility: visible;}
 </style>
 """, unsafe_allow_html=True)
 
