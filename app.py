@@ -91,7 +91,7 @@ try:
     all_y = sorted(df_s['年度'].dropna().unique(), reverse=True)
 
     # --- サイドバー (アイコン追加 + 広告アプリへのリンク) ---
-    st.sidebar.markdown('<h2><i class="fa-solid fa-chart-line"></i> Amazon Sales Analytics</h2>', unsafe_allow_html=True)
+    st.sidebar.markdown('<h2>Amazon Sales Analytics</h2>', unsafe_allow_html=True)
     
     st.sidebar.link_button("広告実績へ切り替える", "https://amazon-ads-app.streamlit.app/")
     st.sidebar.markdown("---")
