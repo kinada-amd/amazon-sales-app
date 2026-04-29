@@ -7,43 +7,27 @@ import plotly.graph_objects as go
 # 1. ページ設定
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正（白背景・Interフォント強制・メニュー非表示）
+# 2. デザイン修正
 st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
-#MainMenu, header, footer, .stAppDeployButton { visibility: hidden !important; display: none !important; }
-div[data-testid="stDecoration"] { display: none !important; }
-html, body, [data-testid="stAppViewContainer"], .stApp {
-    background-color: #FFFFFF !important;
-    color: #131921 !important;
-    font-family: 'Inter', sans-serif !important;
-}
-[data-testid="stSidebar"] { 
-    background-color: #131921 !important; 
-    color: #FFFFFF !important;
-}
-[data-testid="stSidebar"] * { color: #FFFFFF !important; }
-[data-testid="stSidebar"] div[data-baseweb="radio"] * { color: #FFFFFF !important; }
-div[data-baseweb="select"] > div { 
-    background-color: #FFFFFF !important; 
-    color: #131921 !important;
-    border: 1px solid #D5D9D9 !important; 
-}
-div[data-baseweb="popover"] * { color: #131921 !important; }
-div[data-testid="stMetricValue"] { 
-    color: #131921 !important; 
-    font-weight: 800 !important; 
-    letter-spacing: -0.03em !important; 
-}
-h1, h2, h3 { 
-    color: #131921 !important; 
-    font-weight: 800 !important; 
-    font-family: 'Inter', sans-serif !important;
-}
-input { color: #131921 !important; }
-.st-emotion-cache-zy6yx3 { padding-top: 1rem !important; }
-</style>
-""", unsafe_allow_html=True)
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+    input { color: #131921 !important; }
+    div[data-baseweb="select"] * { color: #131921 !important; }
+    html, body, [data-testid="stAppViewContainer"], .stApp {
+        background-color: #FFFFFF !important;
+        color: #131921 !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    #MainMenu, footer { visibility: hidden !important; }
+    [data-testid="stSidebar"] { background-color: #131921 !important; }
+    [data-testid="stSidebar"] * { color: #FFFFFF !important; }
+    [data-testid="stSidebar"] div[data-baseweb="radio"] * { color: #FFFFFF !important; }
+    div[data-baseweb="select"] > div { background-color: #FFFFFF !important; border: 1px solid #D5D9D9 !important; }
+    div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important; }
+    h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; }
+    .st-emotion-cache-zy6yx3 {padding-top: 3rem;}
+    </style>
+    """, unsafe_allow_html=True)
 
 @st.cache_data(ttl=300)
 def load_data(url):
@@ -62,7 +46,7 @@ def show_product_detail(asin, full_data, summary_row):
             x=prod_trend['日付_dt'], 
             y=prod_trend['売上'], 
             customdata=prod_trend['数量'],
-            mode='markers+lines', 
+            mode='lines+markers', 
             line=dict(color='#FF9900', width=3),
             marker=dict(size=8),
             hovertemplate='<b>%{x|%Y年%m月}</b><br>売上: ¥%{y:,.0f}<br>数量: %{customdata:,.0f} 個<extra></extra>', 
@@ -80,8 +64,8 @@ def show_product_detail(asin, full_data, summary_row):
         st.metric("季節性スコア", f"{summary_row['季節性']:.2f}")
 
 try:
-    df_m = pd.read_excel(load_data("https://gigaplus.makeshop.jp/aimedia/data/master.xlsx"))
-    df_s = pd.read_excel(load_data("https://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"))
+    df_m = pd.read_excel(load_data("http://gigaplus.makeshop.jp/aimedia/data/master.xlsx"))
+    df_s = pd.read_excel(load_data("http://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"))
 
     df_s.columns = df_s.columns.str.strip()
     df_m.columns = df_m.columns.str.strip()
@@ -133,9 +117,7 @@ try:
     sum_now = raw_now.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
     sum_now = get_ana(df_f, sum_now)
 
-    # メインタイトル修正
-    st.title(f"Sales Summary : {target_p}")
-    
+    st.title("Sales Performance Dashboard")
     m1, m2, m3 = st.columns(3)
     v_now = sum_now['売上'].sum()
 
@@ -182,15 +164,18 @@ try:
         c1, c2 = f"売上({target_p})", f"売上({comp_p})"
         c_q_n, c_q_p = f"数量({target_p})", f"数量({comp_p})"
         
+        # --- ここに 'コード' を追加 ---
         disp = disp[['ABC', 'ASIN', 'コード', '正式品名', '規格', '売上', '売上_c', '売上MoM(%)', '数量', '数量_c', '数量MoM(%)', '季節性']].copy()
         disp.columns = ['ABC', 'ASIN', 'コード', '正式品名', '規格', c1, c2, '売上MoM(%)', c_q_n, c_q_p, '数量MoM(%)', '季節性']
         fmt = {c1: '¥{:,.0f}', c2: '¥{:,.0f}', '売上MoM(%)': '{:+.1f}%', c_q_n: '{:,.0f}', c_q_p: '{:,.0f}', '数量MoM(%)': '{:+.1f}%', '季節性': '{:.2f}'}
     else:
+        # --- ここに 'コード' を追加 ---
         disp = sum_now[['ABC', 'ASIN', 'コード', '正式品名', '規格', '売上', '数量', '季節性']].copy()
         fmt = {'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性': '{:.2f}'}
 
     search = st.text_input("検索窓 (正式品名, ASIN, コード)", "").lower()
     if search:
+        # 検索条件に 'コード' を追加
         disp = disp[
             disp['正式品名'].str.lower().str.contains(search, na=False) | 
             disp['ASIN'].str.lower().str.contains(search, na=False) |
