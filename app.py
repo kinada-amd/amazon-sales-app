@@ -9,57 +9,41 @@ st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sid
 
 # 2. デザイン修正
 st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
-    
-    /* ヘッダー・フッター・メニュー・デプロイボタンの完全非表示 */
-    #MainMenu, header, footer, .stAppDeployButton { visibility: hidden !important; display: none !important; }
-    div[data-testid="stDecoration"] { display: none !important; }
-
-    /* 全体背景を白、文字色をダークネイビーに強制固定（ダークモード対策） */
-    html, body, [data-testid="stAppViewContainer"], .stApp {
-        background-color: #FFFFFF !important;
-        color: #131921 !important;
-        font-family: 'Inter', sans-serif !important;
-    }
-
-    /* サイドバーの設定：背景をネイビー、文字を白 */
-    [data-testid="stSidebar"] { 
-        background-color: #131921 !important; 
-        color: #FFFFFF !important;
-    }
-    [data-testid="stSidebar"] * { color: #FFFFFF !important; }
-    
-    /* サイドバー内のラジオボタンや入力欄の背景調整 */
-    [data-testid="stSidebar"] div[data-baseweb="radio"] * { color: #FFFFFF !important; }
-    div[data-baseweb="select"] > div { 
-        background-color: #FFFFFF !important; 
-        color: #131921 !important;
-        border: 1px solid #D5D9D9 !important; 
-    }
-    /* 選択肢ドロップダウンの文字色 */
-    div[data-baseweb="popover"] * { color: #131921 !important; }
-
-    /* メインエリアのメトリックとタイトルのスタイル */
-    div[data-testid="stMetricValue"] { 
-        color: #131921 !important; 
-        font-weight: 800 !important; 
-        letter-spacing: -0.03em !important; 
-    }
-    h1, h2, h3 { 
-        color: #131921 !important; 
-        font-weight: 800 !important; 
-        font-family: 'Inter', sans-serif !important;
-    }
-    
-    /* 検索窓（TextInput）の文字色 */
-    input { color: #131921 !important; }
-
-    /* 余白調整 */
-    .st-emotion-cache-zy6yx3 { padding-top: 1rem !important; }
-    </style>
-    """, unsafe_allow_html=True)
-    """, unsafe_allow_html=True)
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+#MainMenu, header, footer, .stAppDeployButton { visibility: hidden !important; display: none !important; }
+div[data-testid="stDecoration"] { display: none !important; }
+html, body, [data-testid="stAppViewContainer"], .stApp {
+    background-color: #FFFFFF !important;
+    color: #131921 !important;
+    font-family: 'Inter', sans-serif !important;
+}
+[data-testid="stSidebar"] { 
+    background-color: #131921 !important; 
+    color: #FFFFFF !important;
+}
+[data-testid="stSidebar"] * { color: #FFFFFF !important; }
+[data-testid="stSidebar"] div[data-baseweb="radio"] * { color: #FFFFFF !important; }
+div[data-baseweb="select"] > div { 
+    background-color: #FFFFFF !important; 
+    color: #131921 !important;
+    border: 1px solid #D5D9D9 !important; 
+}
+div[data-baseweb="popover"] * { color: #131921 !important; }
+div[data-testid="stMetricValue"] { 
+    color: #131921 !important; 
+    font-weight: 800 !important; 
+    letter-spacing: -0.03em !important; 
+}
+h1, h2, h3 { 
+    color: #131921 !important; 
+    font-weight: 800 !important; 
+    font-family: 'Inter', sans-serif !important;
+}
+input { color: #131921 !important; }
+.st-emotion-cache-zy6yx3 { padding-top: 1rem !important; }
+</style>
+""", unsafe_allow_html=True)
 
 @st.cache_data(ttl=300)
 def load_data(url):
@@ -96,8 +80,8 @@ def show_product_detail(asin, full_data, summary_row):
         st.metric("季節性スコア", f"{summary_row['季節性']:.2f}")
 
 try:
-    df_m = pd.read_excel(load_data("http://gigaplus.makeshop.jp/aimedia/data/master.xlsx"))
-    df_s = pd.read_excel(load_data("http://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"))
+    df_m = pd.read_excel(load_data("https://gigaplus.makeshop.jp/aimedia/data/master.xlsx"))
+    df_s = pd.read_excel(load_data("https://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"))
 
     df_s.columns = df_s.columns.str.strip()
     df_m.columns = df_m.columns.str.strip()
@@ -149,7 +133,8 @@ try:
     sum_now = raw_now.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
     sum_now = get_ana(df_f, sum_now)
 
-    st.title("Sales Performance Dashboard")
+    st.title(f"Sales Summary : {target_p}")
+    
     m1, m2, m3 = st.columns(3)
     v_now = sum_now['売上'].sum()
 
@@ -197,37 +182,4 @@ try:
         c_q_n, c_q_p = f"数量({target_p})", f"数量({comp_p})"
         
         disp = disp[['ABC', 'ASIN', 'コード', '正式品名', '規格', '売上', '売上_c', '売上MoM(%)', '数量', '数量_c', '数量MoM(%)', '季節性']].copy()
-        disp.columns = ['ABC', 'ASIN', 'コード', '正式品名', '規格', c1, c2, '売上MoM(%)', c_q_n, c_q_p, '数量MoM(%)', '季節性']
-        fmt = {c1: '¥{:,.0f}', c2: '¥{:,.0f}', '売上MoM(%)': '{:+.1f}%', c_q_n: '{:,.0f}', c_q_p: '{:,.0f}', '数量MoM(%)': '{:+.1f}%', '季節性': '{:.2f}'}
-    else:
-        disp = sum_now[['ABC', 'ASIN', 'コード', '正式品名', '規格', '売上', '数量', '季節性']].copy()
-        fmt = {'売上': '¥{:,.0f}', '数量': '{:,.0f}', '季節性': '{:.2f}'}
-
-    search = st.text_input("検索窓 (正式品名, ASIN, コード)", "").lower()
-    if search:
-        disp = disp[
-            disp['正式品名'].str.lower().str.contains(search, na=False) | 
-            disp['ASIN'].str.lower().str.contains(search, na=False) |
-            disp['コード'].str.lower().str.contains(search, na=False)
-        ]
-
-    try:
-        disp = disp.reset_index(drop=True)
-        event = st.dataframe(
-            disp.style.format(fmt).map(style_table, subset=['ABC']), 
-            use_container_width=True, 
-            height=600,
-            hide_index=True,
-            on_select="rerun",
-            selection_mode="single-row"
-        )
-        if event.selection.rows:
-            selected_row_idx = event.selection.rows[0]
-            selected_row_data = disp.iloc[selected_row_idx]
-            show_product_detail(selected_row_data['ASIN'], df_f, selected_row_data)
-
-    except Exception:
-        st.warning("⚠️ **表示期間の設定を確認してください**")
-
-except Exception as e:
-    st.error(f"システムエラーが発生しました。設定を確認してください。")
+        disp.columns = ['ABC', 'ASIN', 'コード', '正式品名', '規格', c1, c2, '売上MoM(%)', c_q_n, c_q_p, '数量MoM(%)', '季節性
