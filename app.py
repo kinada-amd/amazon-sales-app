@@ -25,7 +25,7 @@ st.markdown("""
     div[data-baseweb="select"] > div { background-color: #FFFFFF !important; border: 1px solid #D5D9D9 !important; }
     div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important; }
     h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; font-family: 'Inter', sans-serif !important; }
-    .st-emotion-cache-zy6yx3 {padding-top: 2rem;padding-bottom: 3rem;}
+    .st-emotion-cache-zy6yx3 {padding-top: 1rem;padding-bottom: 3rem;}
     .st-emotion-cache-scp8yw {display: none!important;}
     .st-emotion-cache-qmp9ai {visibility: visible !important;}
     .st-emotion-cache-10p9htt {margin-bottom: 0 !important;}
