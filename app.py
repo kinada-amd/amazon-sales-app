@@ -196,6 +196,7 @@ try:
             disp['コード'].str.lower().str.contains(search, na=False)
         ]
 
+
     try:
         disp = disp.reset_index(drop=True)
         event = st.dataframe(
