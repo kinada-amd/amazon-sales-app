@@ -92,7 +92,7 @@ try:
     # --- サイドバー (アイコン追加 + 広告アプリへのリンク) ---
     st.sidebar.markdown('<h2><i class="fa-solid fa-chart-line"></i> Amazon Analytics</h2>', unsafe_allow_html=True)
     
-    st.sidebar.link_button("📢 広告実績分析へ移動", "https://amazon-ads-app.streamlit.app/")
+    st.sidebar.link_button("広告実績分析へ移動", "https://amazon-ads-app.streamlit.app/")
     st.sidebar.markdown("---")
 
     mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"], key="mode")
