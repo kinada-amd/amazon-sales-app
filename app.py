@@ -7,40 +7,58 @@ import plotly.graph_objects as go
 # 1. ページ設定
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正（外部リンク・メニュー類を完全に非表示にする設定を追加）
+# 2. デザイン修正
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
     
-    /* 外部リンク・メニュー類の非表示設定 */
-    #MainMenu {visibility: hidden;} /* 右上の三本線メニュー */
-    header {visibility: hidden;}   /* GitHubリンクなどを含むヘッダー全体 */
-    footer {visibility: hidden;}   /* Hosted with Streamlitを含むフッター全体 */
-    .stAppDeployButton {display:none;} /* デプロイボタン（もしあれば） */
-    
-    /* 入力エリア・セレクトボックスの文字色 */
-    input { color: #131921 !important; }
-    div[data-baseweb="select"] * { color: #131921 !important; }
-    
+    /* ヘッダー・フッター・メニュー・デプロイボタンの完全非表示 */
+    #MainMenu, header, footer, .stAppDeployButton { visibility: hidden !important; display: none !important; }
+    div[data-testid="stDecoration"] { display: none !important; }
+
+    /* 全体背景を白、文字色をダークネイビーに強制固定（ダークモード対策） */
     html, body, [data-testid="stAppViewContainer"], .stApp {
         background-color: #FFFFFF !important;
         color: #131921 !important;
         font-family: 'Inter', sans-serif !important;
     }
 
-    [data-testid="stHeader"] { 
-        background-color: rgba(255, 255, 255, 0) !important; 
-        color: #131921 !important;
+    /* サイドバーの設定：背景をネイビー、文字を白 */
+    [data-testid="stSidebar"] { 
+        background-color: #131921 !important; 
+        color: #FFFFFF !important;
     }
-
-    [data-testid="stSidebar"] { background-color: #131921 !important; }
     [data-testid="stSidebar"] * { color: #FFFFFF !important; }
+    
+    /* サイドバー内のラジオボタンや入力欄の背景調整 */
     [data-testid="stSidebar"] div[data-baseweb="radio"] * { color: #FFFFFF !important; }
-    div[data-baseweb="select"] > div { background-color: #FFFFFF !important; border: 1px solid #D5D9D9 !important; }
-    div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important; }
-    h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; }
-    .st-emotion-cache-zy6yx3 {padding-top: 1rem;} /* ヘッダーを消した分、上の余白を調整 */
+    div[data-baseweb="select"] > div { 
+        background-color: #FFFFFF !important; 
+        color: #131921 !important;
+        border: 1px solid #D5D9D9 !important; 
+    }
+    /* 選択肢ドロップダウンの文字色 */
+    div[data-baseweb="popover"] * { color: #131921 !important; }
+
+    /* メインエリアのメトリックとタイトルのスタイル */
+    div[data-testid="stMetricValue"] { 
+        color: #131921 !important; 
+        font-weight: 800 !important; 
+        letter-spacing: -0.03em !important; 
+    }
+    h1, h2, h3 { 
+        color: #131921 !important; 
+        font-weight: 800 !important; 
+        font-family: 'Inter', sans-serif !important;
+    }
+    
+    /* 検索窓（TextInput）の文字色 */
+    input { color: #131921 !important; }
+
+    /* 余白調整 */
+    .st-emotion-cache-zy6yx3 { padding-top: 1rem !important; }
     </style>
+    """, unsafe_allow_html=True)
     """, unsafe_allow_html=True)
 
 @st.cache_data(ttl=300)
