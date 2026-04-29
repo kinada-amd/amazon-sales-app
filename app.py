@@ -7,18 +7,12 @@ import plotly.graph_objects as go
 # 1. ページ設定
 st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正（外部リンク・メニュー類を完全に非表示にする設定を追加）
+# 2. デザイン修正（フォント・アイコン・白文字化対策）
 st.markdown("""
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
     
-    /* 外部リンク・メニュー類の非表示設定 */
-    #MainMenu {visibility: hidden;} /* 右上の三本線メニュー */
-    header {visibility: hidden;}   /* GitHubリンクなどを含むヘッダー全体 */
-    footer {visibility: hidden;}   /* Hosted with Streamlitを含むフッター全体 */
-    .stAppDeployButton {display:none;} /* デプロイボタン（もしあれば） */
-    
-    /* 入力エリア・セレクトボックスの文字色 */
     input { color: #131921 !important; }
     div[data-baseweb="select"] * { color: #131921 !important; }
     
@@ -27,25 +21,31 @@ st.markdown("""
         color: #131921 !important;
         font-family: 'Inter', sans-serif !important;
     }
-
-    [data-testid="stHeader"] { 
-        background-color: rgba(255, 255, 255, 0) !important; 
-        color: #131921 !important;
-    }
+    
+    /* 外部へのリンク類を非表示 */
+    #MainMenu, footer, header { visibility: hidden !important; display: none !important; }
+    div[data-testid="stDecoration"] { display: none !important; }
+    .stAppDeployButton, [data-testid="stStatusWidget"] {display:none !important;}
 
     [data-testid="stSidebar"] { background-color: #131921 !important; }
     [data-testid="stSidebar"] * { color: #FFFFFF !important; }
     [data-testid="stSidebar"] div[data-baseweb="radio"] * { color: #FFFFFF !important; }
     div[data-baseweb="select"] > div { background-color: #FFFFFF !important; border: 1px solid #D5D9D9 !important; }
-    div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important; }
-    h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; }
-    .st-emotion-cache-zy6yx3 {padding-top: 1rem;} /* ヘッダーを消した分、上の余白を調整 */
+    
+    div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important; font-family: 'Inter', sans-serif !important; }
+    
+    /* タイトルフォントをInterに固定 */
+    h1 { font-family: 'Inter', sans-serif !important; font-weight: 800 !important; color: #131921 !important; }
+    h2, h3 { color: #131921 !important; font-weight: 800 !important; font-family: 'Inter', sans-serif !important; }
+    
+    .st-emotion-cache-zy6yx3 {padding-top: 2rem;padding-bottom: 3rem;}
     </style>
     """, unsafe_allow_html=True)
 
 @st.cache_data(ttl=300)
 def load_data(url):
     res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    res.raise_for_status()
     return io.BytesIO(res.content)
 
 @st.dialog("商品詳細分析", width="large")
@@ -78,8 +78,8 @@ def show_product_detail(asin, full_data, summary_row):
         st.metric("季節性スコア", f"{summary_row['季節性']:.2f}")
 
 try:
-    df_m = pd.read_excel(load_data("http://gigaplus.makeshop.jp/aimedia/data/master.xlsx"))
-    df_s = pd.read_excel(load_data("http://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"))
+    df_m = pd.read_excel(load_data("https://gigaplus.makeshop.jp/aimedia/data/master.xlsx"))
+    df_s = pd.read_excel(load_data("https://gigaplus.makeshop.jp/aimedia/data/sales.xlsx"))
 
     df_s.columns = df_s.columns.str.strip()
     df_m.columns = df_m.columns.str.strip()
@@ -95,7 +95,9 @@ try:
     all_m = sorted(df_s['年月'].dropna().unique(), reverse=True)
     all_y = sorted(df_s['年度'].dropna().unique(), reverse=True)
 
-    st.sidebar.title("Amazon Analytics")
+    # --- サイドバー (アイコンを追加) ---
+    st.sidebar.markdown('<h2><i class="fa-solid fa-chart-line"></i> Amazon Analytics</h2>', unsafe_allow_html=True)
+    
     mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"], key="mode")
     unit = st.sidebar.radio("表示単位を選択", ["月単位", "年度単位"], horizontal=True)
 
@@ -131,7 +133,9 @@ try:
     sum_now = raw_now.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
     sum_now = get_ana(df_f, sum_now)
 
-    st.title("Sales Performance Dashboard")
+    # --- タイトルを動的に変更 (Sales : 期間) ---
+    st.title(f"Sales : {target_p}")
+    
     m1, m2, m3 = st.columns(3)
     v_now = sum_now['売上'].sum()
 
