@@ -29,6 +29,8 @@ st.markdown("""
     .st-emotion-cache-scp8yw {display: none!important;}
     ._container_gzau3_1 {display: none!important;}
     ._profileContainer_gzau3_53 {display: none!important;}
+    ._link_gzau3_10 {display: none!important;}
+    ._viewerBadge_nim44_23 {display: none!important;}
     </style>
     """, unsafe_allow_html=True)
 
