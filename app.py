@@ -5,39 +5,42 @@ import requests
 import plotly.graph_objects as go
 
 # 1. ページ設定
-st.set_page_config(page_title="Amazon Sales Analytics", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Amazon Analytics Pro", layout="wide", initial_sidebar_state="expanded")
 
-# 2. デザイン修正（バグ徹底排除・フォント同期・アイコン刷新）
+# 2. デザイン修正（フォント・アイコン・白文字化対策）
 st.markdown("""
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
-.stAppDeployButton, [data-testid="stStatusWidget"], footer, header, #MainMenu { visibility: hidden !important; display: none !important; }
-div[data-testid="stDecoration"] { display: none !important; }
-html, body, [data-testid="stAppViewContainer"], .stApp {
-    background-color: #FFFFFF !important;
-    color: #131921 !important;
-    font-family: 'Inter', sans-serif !important;
-}
-[data-testid="stSidebar"] { background-color: #131921 !important; }
-[data-testid="stSidebar"] * { color: #FFFFFF !important; }
-div[data-baseweb="select"] * { color: #131921 !important; }
-.stLinkButton a {
-    background-color: #37475a !important;
-    border: 1px solid #a2a6ac !important;
-    color: white !important;
-    border-radius: 8px !important;
-    font-weight: 700 !important;
-    text-decoration: none !important;
-}
-div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; font-family: 'Inter', sans-serif !important; }
-h1, h2, h3 { color: #131921 !important; font-weight: 800 !important; font-family: 'Inter', sans-serif !important; }
-.st-emotion-cache-zy6yx3 {padding-top: 1rem !important;padding-bottom: 3rem !important;}
-.st-emotion-cache-qmp9ai {visibility: visible;}
-.st-emotion-cache-1r1cntt {padding-top: 1rem;}
-.st-emotion-cache-10p9htt {display: none;}
-</style>
-""", unsafe_allow_html=True)
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+    
+    input { color: #131921 !important; }
+    div[data-baseweb="select"] * { color: #131921 !important; }
+    
+    html, body, [data-testid="stAppViewContainer"], .stApp {
+        background-color: #FFFFFF !important;
+        color: #131921 !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+    
+    /* 外部へのリンク類を非表示 */
+    #MainMenu, footer, header { visibility: hidden !important; display: none !important; }
+    div[data-testid="stDecoration"] { display: none !important; }
+    .stAppDeployButton, [data-testid="stStatusWidget"] {display:none !important;}
+
+    [data-testid="stSidebar"] { background-color: #131921 !important; }
+    [data-testid="stSidebar"] * { color: #FFFFFF !important; }
+    [data-testid="stSidebar"] div[data-baseweb="radio"] * { color: #FFFFFF !important; }
+    div[data-baseweb="select"] > div { background-color: #FFFFFF !important; border: 1px solid #D5D9D9 !important; }
+    
+    div[data-testid="stMetricValue"] { color: #131921 !important; font-weight: 800 !important; letter-spacing: -0.03em !important; font-family: 'Inter', sans-serif !important; }
+    
+    /* タイトルフォントをInterに固定 */
+    h1 { font-family: 'Inter', sans-serif !important; font-weight: 800 !important; color: #131921 !important; }
+    h2, h3 { color: #131921 !important; font-weight: 800 !important; font-family: 'Inter', sans-serif !important; }
+    
+    .st-emotion-cache-zy6yx3 {padding-top: 2rem;padding-bottom: 3rem;}
+    </style>
+    """, unsafe_allow_html=True)
 
 @st.cache_data(ttl=300)
 def load_data(url):
@@ -92,12 +95,9 @@ try:
     all_m = sorted(df_s['年月'].dropna().unique(), reverse=True)
     all_y = sorted(df_s['年度'].dropna().unique(), reverse=True)
 
-    # --- サイドバー (アイコン追加 + 広告アプリへのリンク) ---
-    st.sidebar.markdown('<h2>Amazon Sales Analytics</h2>', unsafe_allow_html=True)
+    # --- サイドバー (アイコンを追加) ---
+    st.sidebar.markdown('<h2><i class="fa-solid fa-chart-line"></i> Amazon Analytics</h2>', unsafe_allow_html=True)
     
-    st.sidebar.link_button("広告実績へ切り替える", "https://amazon-ads-app.streamlit.app/")
-    st.sidebar.markdown("---")
-
     mode = st.sidebar.radio("表示モードを選択", ["通常モード", "比較モード"], key="mode")
     unit = st.sidebar.radio("表示単位を選択", ["月単位", "年度単位"], horizontal=True)
 
@@ -133,7 +133,8 @@ try:
     sum_now = raw_now.groupby(['ASIN', 'コード', '正式品名', '規格']).agg({'売上':'sum', '数量':'sum'}).reset_index()
     sum_now = get_ana(df_f, sum_now)
 
-    st.title(f"Sales Summary : {target_p}")
+    # --- タイトルを動的に変更 (Sales : 期間) ---
+    st.title(f"Sales : {target_p}")
     
     m1, m2, m3 = st.columns(3)
     v_now = sum_now['売上'].sum()
@@ -191,11 +192,10 @@ try:
     search = st.text_input("検索窓 (正式品名, ASIN, コード)", "").lower()
     if search:
         disp = disp[
-            disp['正式品名'].str.lower().str.contains(search, na=False) | 
-            disp['ASIN'].str.lower().str.contains(search, na=False) |
-            disp['コード'].str.lower().str.contains(search, na=False)
+            disp['正式品名'].astype(str).str.lower().str.contains(search, na=False) | 
+            disp['ASIN'].astype(str).str.lower().str.contains(search, na=False) |
+            disp['コード'].astype(str).str.lower().str.contains(search, na=False)
         ]
-
 
     try:
         disp = disp.reset_index(drop=True)
