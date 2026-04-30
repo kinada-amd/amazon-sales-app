@@ -192,9 +192,9 @@ try:
     search = st.text_input("検索窓 (正式品名, ASIN, コード)", "").lower()
     if search:
         disp = disp[
-            disp['正式品名'].astype(str).str.lower().str.contains(search, na=False) | 
-            disp['ASIN'].astype(str).str.lower().str.contains(search, na=False) |
-            disp['コード'].astype(str).str.lower().str.contains(search, na=False)
+            disp['正式品名'].str.lower().str.contains(search, na=False) | 
+            disp['ASIN'].str.lower().str.contains(search, na=False) |
+            disp['コード'].str.lower().str.contains(search, na=False)
         ]
 
     try:
